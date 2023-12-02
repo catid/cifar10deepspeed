@@ -1,0 +1,9 @@
+*.png
+*.jp2
+*.mp4
+*.mkv
+*.pyc
+build/
+*.txt
+logs/
+output_model/
