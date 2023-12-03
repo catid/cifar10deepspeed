@@ -6,6 +6,8 @@ I would like to use this as a scalable training script for exploring modificatio
 
 As compared to the `vision-transformers-cifar10` repo: This repo uses about half as many epochs, each running about 2x faster, so about 4x faster overall, to train the same model with 3% higher accuracy scores.
 
+Experimental runs (git hash, results, all parameters) are recorded to a results text file so that you can run a batch of experiments and then use the results text file to reproduce the results and generate graphs.
+
 ## Setup
 
 Install conda: https://docs.conda.io/projects/miniconda/en/latest/index.html

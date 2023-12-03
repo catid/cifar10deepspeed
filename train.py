@@ -71,7 +71,6 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
 
     return train_loss
 
-
 def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engine, image_dtype):
     val_loss = 0.0
     correct = 0
@@ -132,13 +131,66 @@ def get_absolute_path(relative_path):
 
     return absolute_path
 
+import subprocess
+from datetime import datetime
+
+def record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch):
+    git_hash = "Git hash unavailable"
+    try:
+        git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    except subprocess.CalledProcessError:
+        pass
+
+    datetime_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    data = {}
+    data["name"] = args.name
+    data["notes"] = args.notes
+    data["arch"] = args.arch
+    data["params"] = args.params
+    data["best_val_acc"] = best_val_acc
+    data["best_train_loss"] = best_train_loss
+    data["best_val_loss"] = best_val_loss
+    data["end_epoch"] = end_epoch
+    data["git_hash"] = git_hash
+    data["timestamp"] = datetime_string
+    data["seed"] = args.seed
+
+    record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value]
+    text = "Experiment:\n" + "\n".join(record_lines) + "\n\n"
+
+    with open(args.result_file, "a") as file:
+        file.write(text)
+
+def synchronize_seed(args, rank, shard_id):
+    if args.seed < 0:
+        seed = get_true_random_32bit_positive_integer()
+    else:
+        seed = args.seed
+
+    if shard_id == 0:
+        seed_tensor = torch.tensor(seed, dtype=torch.long)  # A tensor with the value to be sent
+    else:
+        seed_tensor = torch.zeros(1, dtype=torch.long)  # A tensor to receive the value
+
+    seed_tensor = seed_tensor.cuda(rank)
+
+    comm.broadcast(tensor=seed_tensor, src=0)
+
+    seed = int(seed_tensor.item()) + shard_id
+    args.seed = seed
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    log_all(f"Using seed: {seed} for shard_id={shard_id}")
+    return seed
+
+
 def main(args):
     params = {}
     #params['learning_rate'] = 0.001
-
-    torch.manual_seed(42)
-    np.random.seed(0)
-    random.seed(0)
 
     deepspeed.init_distributed(
         dist_backend="nccl",
@@ -158,14 +210,16 @@ def main(args):
     log_dir = f"{args.log_dir}/cifar10"
     os.makedirs(log_dir, exist_ok=True)
 
-    torch.distributed.barrier()
+    log_0(f"Arguments: {args}")
+
+    comm.barrier()
 
     if args.reset:
         log_0("Resetting training - deleting Tensorboard directory")
         if is_main_process():
             delete_folder_contents(log_dir)
 
-    torch.distributed.barrier()
+    comm.barrier()
 
     tensorboard = SummaryWriter(log_dir=log_dir)
 
@@ -184,10 +238,11 @@ def main(args):
     data_loader_batch_size = model_engine.train_micro_batch_size_per_gpu()
     steps_per_print = model_engine.steps_per_print()
 
-    log_all(f"rank = {rank}, num_shards = {num_gpus}, shard_id={shard_id}, train_batch_size = {train_batch_size}, data_loader_batch_size = {data_loader_batch_size}, steps_per_print = {steps_per_print}")
+    seed = synchronize_seed(args, rank, shard_id)
+
+    log_all(f"rank = {rank}, num_shards = {num_gpus}, shard_id={shard_id}, train_batch_size = {train_batch_size}, data_loader_batch_size = {data_loader_batch_size}, steps_per_print = {steps_per_print}, seed={seed}")
 
     num_loader_threads = os.cpu_count()//2
-    seed = 0
     crop_w = 32
     crop_h = 32
 
@@ -231,9 +286,12 @@ def main(args):
 
     # Initialize training
 
+    best_train_loss = float("inf")
     best_val_loss = float("inf")
+    best_val_acc = float("inf")
     avg_val_loss = float("inf")
     start_epoch = 0
+    end_epoch = 0
     epochs_without_improvement = 0
 
     if args.reset:
@@ -259,6 +317,7 @@ def main(args):
     # Training/validation loop
 
     for epoch in range(start_epoch, args.max_epochs):
+        end_epoch = epoch
         start_time = time.time()
 
         train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, image_dtype)
@@ -310,9 +369,11 @@ def main(args):
         # Check if validation loss has improved
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
+            best_val_acc = val_acc
+            best_train_loss = avg_train_loss
             epochs_without_improvement = 0
 
-            log_0(f'New best validation loss: {best_val_loss:.4f}  Validation accuracy: {val_acc:.2f}%')
+            log_0(f'New best validation loss: {best_val_loss:.4f}  Validation accuracy: {best_val_acc:.2f}%')
 
             client_state = {
                 'train_version': 1,
@@ -332,20 +393,31 @@ def main(args):
                 saved_state_dict = model_engine.state_dict()
                 fixed_state_dict = {key.replace("module.", ""): value for key, value in saved_state_dict.items()}
                 torch.save(fixed_state_dict, args.output_model)
-                log_0(f"Wrote model to {args.output_model} with val_loss={best_val_loss:.4f}, val_acc={val_acc:.2f}%")
+                log_0(f"Wrote model to {args.output_model} with val_loss={best_val_loss:.4f}, val_acc={best_val_acc:.2f}%")
         else:
             epochs_without_improvement += 1
 
             # Early stopping condition
             if epochs_without_improvement >= args.patience:
-                log_0(f"Early stopping at epoch {epoch}, best validation loss: {best_val_loss:.4f}")
+                log_0(f"Early stopping at epoch {epoch} due to epochs_without_improvement={epochs_without_improvement}")
                 break
 
     if is_main_process():
-        log_0(f'Training complete.  Best model was written to {args.output_model}  Final best validation loss: {best_val_loss}, accuracy: {val_acc:.2f}%')
+        log_0(f'Training complete.  Best model was written to {args.output_model}  Final best validation loss: {best_val_loss}, best validation accuracy: {best_val_acc:.2f}%')
+
+        record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch)
+
+def get_true_random_32bit_positive_integer():
+    random_bytes = bytearray(os.urandom(4))
+    random_bytes[0] &= 0x7F # Clear high bit
+    random_int = int.from_bytes(bytes(random_bytes), byteorder='big')
+    return random_int
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
+    parser.add_argument("--name", type=str, default="", help="Give your experiment a name")
+    parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture defined in models/model_loader.py")
+    parser.add_argument("--params", type=str, default="dim=512 depth=4 heads=6 mlp_dim=256", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
     parser.add_argument("--max-epochs", type=int, default=400, help="Maximum epochs to train")
@@ -354,6 +426,9 @@ if __name__ == "__main__":
     parser.add_argument("--log-dir", type=str, default="tb_logs", help="Path to the Tensorboard logs")
     parser.add_argument("--reset", action="store_true", help="Reset training from scratch")
     parser.add_argument("--output-model", type=str, default="cifar10.pth", help="Output model file name")
+    parser.add_argument("--result-file", type=str, default="results.txt", help="Append the experiment results to a file")
+    parser.add_argument("--notes", type=str, default="", help="Provide any additional notes about the experiment to record")
+    parser.add_argument("--seed", type=int, default=-1, help="Seed for random numbers.  Set to -1 to pick a random seed")
 
     parser = deepspeed.add_config_arguments(parser)
 
