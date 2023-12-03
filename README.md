@@ -6,15 +6,31 @@ I would like to use this as a scalable training script for exploring modificatio
 
 ## Setup
 
+Install conda: https://docs.conda.io/projects/miniconda/en/latest/index.html
+
+Make sure your Nvidia drivers are installed properly by running `nvidia-smi`.  If not, you may need to run something like `sudo apt install nvidia-driver-535-server` or newer.
+
+Install CUDA toolkit:
+
+```bash
+# Here's how to do it on Ubuntu:
+sudo apt install nvidia-cuda-toolkit
+```
+
+Make sure you can use `nvcc`:
+
+```bash
+nvcc --version
+```
+
+Setup the software from this repo:
+
 ```bash
 git clone https://github.com/catid/cifar100deepspeed
 cd cifar100deepspeed
 
 conda create -n train python=3.10
 conda activate train
-
-# Update this from https://pytorch.org/get-started/locally/
-pip3 install --upgrade torch torchvision functorch --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Update this from https://github.com/NVIDIA/DALI#installing-dali
 pip install --upgrade nvidia-dali-cuda110 --extra-index-url https://developer.download.nvidia.com/compute/redist
