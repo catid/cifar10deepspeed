@@ -43,8 +43,8 @@ def png_pipeline(data_dir=None, file_list=None, mode="training", crop_w=32, crop
             mirror=fn.random.coin_flip(probability=0.4))
 
         # 20% of the time, apply random brightness adjust betwen 50% and 120%
-        brightness = 1.0 + fn.random.coin_flip(probability=0.2) * fn.random.uniform(range=(-0.5, 0.2))
-        images = fn.brightness(images, device="gpu", brightness=brightness)
+        #brightness = 1.0 + fn.random.coin_flip(probability=0.2) * fn.random.uniform(range=(-0.5, 0.2))
+        #images = fn.brightness(images, device="gpu", brightness=brightness)
 
         # 50% of the time, apply a random rotation of 90, 180, or 270 degrees
         angle = fn.random.coin_flip(probability=0.5) * fn.random.uniform(range=(1, 4), dtype=dali.types.INT32) * 90.0

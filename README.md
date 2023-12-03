@@ -69,12 +69,16 @@ conda activate train
 ./tensorboard.sh
 ```
 
+If you restart training you may need to restart the tensorboard.
+
 
 ## Evaluate
 
 ```bash
 python evaluate.py
 ```
+
+This will print the accuracy % on the test set.  As a sanity check it also reports the test loss of the model, which should match the epoch where it was sampled from during training.
 
 
 ## Set up training cluster
