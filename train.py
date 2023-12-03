@@ -16,8 +16,6 @@ from deepspeed import log_dist
 
 import argparse
 
-from model.vit_small import ViT
-
 from dataloader import CifarDataLoader
 
 from deepspeed.runtime.config import DeepSpeedConfig
@@ -27,7 +25,18 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 def select_model(args):
-    return ViT()
+    from models.vit_small import ViT
+    return ViT(
+        image_size = 32,
+        patch_size = 4,
+        num_classes = 100,
+        dim = 512,
+        depth = 4,
+        heads = 6,
+        mlp_dim = 256,
+        dropout = 0.1,
+        emb_dropout = 0.1
+    )
 
 
 def log_0(msg):

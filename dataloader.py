@@ -1,26 +1,11 @@
 # This uses Nvidia DALI to batch load the images/labels
 
-import tools.normalization_factors
-
-import os
-import time
-
 import nvidia.dali as dali
 import nvidia.dali.fn as fn
-import nvidia.dali.ops as ops
 import nvidia.dali.types as types
 import nvidia.dali.plugin.pytorch as dali_torch
 from nvidia.dali.pipeline import pipeline_def
 from nvidia.dali.plugin.base_iterator import LastBatchPolicy
-import nvidia.dali.backend as backend
-
-import multiprocessing
-
-import cupy as cp
-
-import logging
-from tools.logging_tools import setup_colored_logging
-setup_colored_logging()
 
 @pipeline_def(batch_size=64, num_threads = 8, exec_async=False, exec_pipelined=False)
 def png_pipeline(data_dir=None, file_list=None, mode="training", crop_w=32, crop_h=32,
