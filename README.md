@@ -60,9 +60,9 @@ conda activate train
 ./launch_local_train.sh
 ```
 
-On a 3x 3090 GPU rig (down-volted), I'm getting 2.23 seconds per epoch, which is about 50% faster than the fastest existing repo I've tried.  Note that I'm taking the model with the best validation loss rather than percentage correct, which I think is more correct since the test and validation set are the same, so the % correct result may be slightly lower than other repos report.
+On a 3x 3090 GPU rig (down-volted), I'm getting 1.89 seconds per epoch, which is about 50% faster than the fastest existing repo I've tried.  Note that I'm taking the model with the best validation loss rather than percentage correct, which I think is more correct since the test and validation set are the same, so the % correct result may be slightly lower than other repos report.
 
-The training process will stop after 50 epochs without any improvement in validation loss, which ends up being about 300 epochs, which is about 13 minutes with my hardware.
+The training process will stop after 50 epochs without any improvement in validation loss, which ends up being about 175 epochs, which is about 6 minutes with my hardware.
 
 If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch, which you should do when changing models.
 
