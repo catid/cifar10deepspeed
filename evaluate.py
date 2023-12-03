@@ -107,7 +107,7 @@ def evaluate(model, dataset_dir, fp16=True):
                 loss = criterion(results, labels)
                 _, predicted = results.max(1)
 
-            correct += (predicted == labels).sum().item()
+            correct += torch.eq(predicted, labels).sum().item()
             test_loss += loss.item() * inputs.size(0)
             total += inputs.size(0)
 
@@ -125,7 +125,7 @@ def evaluate(model, dataset_dir, fp16=True):
             loss = criterion(results, labels)
             _, predicted = results.max(1)
 
-        correct += (predicted == labels).sum().item()
+        correct += torch.eq(predicted, labels).sum().item()
         test_loss += loss.item() * inputs.size(0)
         total += inputs.size(0)
 

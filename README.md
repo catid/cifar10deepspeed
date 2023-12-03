@@ -79,10 +79,10 @@ conda activate train
 python evaluate.py
 
 (train) ➜  cifar10deepspeed git:(main) ✗ python evaluate.py
-2023-12-03 08:04:45,390 [INFO] Loading as FP16: True
-Evaluating: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 6047.98it/s]
-2023-12-03 08:04:47,499 [INFO] Test loss = 0.6453640625
-2023-12-03 08:04:47,499 [INFO] Test accuracy: 78.36%
+2023-12-03 08:21:18,315 [INFO] Loading as FP16: True
+Evaluating: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 6119.13it/s]
+2023-12-03 08:21:20,410 [INFO] Test loss = 0.58546015625
+2023-12-03 08:21:20,411 [INFO] Test accuracy: 81.02%
 ```
 
 This will print the accuracy % on the test set.  As a sanity check it also reports the test loss of the model, which should match the epoch where it was sampled from during training.
@@ -95,6 +95,8 @@ You can actually run the evaluation script while the training script is running 
 If using just a single computer for training you can skip this section.
 
 I found that for a 3x 3090 GPU setup with about ~2 Gbps Ethernet between them, it's actually faster to just use one machine for training rather than a cluster.  I haven't tested on my other machines yet, so not sure using a training cluster is ever useful for this problem.
+
+Checkout the code at the same path on each computer.
 
 Edit the `hostfile` to specify the list of nodes in the training cluster.  They must be accessible over SSH without a password: Use `ssh-copy-id myname@hostname` to set this up.
 

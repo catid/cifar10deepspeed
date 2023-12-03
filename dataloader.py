@@ -40,10 +40,10 @@ def png_pipeline(data_dir=None, file_list=None, mode="training", crop_w=32, crop
             #crop_pos_x=fn.random.uniform(range=(0.0, 1.0)),
             #crop_pos_y=fn.random.uniform(range=(0.0, 1.0)),
             output_layout=types.NHWC,
-            mirror=fn.random.coin_flip(probability=0.4))
+            mirror=fn.random.coin_flip(probability=0.3))
 
         # 50% of the time, apply a random rotation of 90, 180, or 270 degrees
-        angle = fn.random.coin_flip(probability=0.5) * fn.random.uniform(range=(1, 4), dtype=dali.types.INT32) * 90.0
+        angle = fn.random.coin_flip(probability=0.3) * fn.random.uniform(range=(1, 4), dtype=dali.types.INT32) * 90.0
         images = fn.rotate(images, device="gpu", angle=angle)
 
         images = fn.random_resized_crop(images, size=(crop_h, crop_w), random_area=[0.25, 1.0], random_aspect_ratio=[1.0, 1.0])

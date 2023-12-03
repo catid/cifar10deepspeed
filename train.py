@@ -46,7 +46,8 @@ def is_main_process():
 def ref_forward_and_loss(criterion, data, labels, model_engine):
     # DeepSpeed: forward + backward + optimize
     outputs = model_engine(data)
-    return criterion(outputs, labels)
+    _, predicted = outputs.max(1)
+    return criterion(outputs, labels), predicted
 
 def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine, image_dtype):
     train_loss = 0.0
@@ -62,7 +63,7 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
 
             labels, images = labels.to(model_engine.local_rank), images.to(model_engine.local_rank)
 
-            loss = opt_forward_and_loss(criterion, images, labels, model_engine)
+            loss, _ = opt_forward_and_loss(criterion, images, labels, model_engine)
 
             model_engine.backward(loss)
             model_engine.step()
@@ -74,6 +75,8 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
 
 def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engine, image_dtype):
     val_loss = 0.0
+    correct = 0
+    total = 0
 
     model_engine.eval()
 
@@ -86,16 +89,19 @@ def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engi
 
             labels, images = labels.to(model_engine.local_rank), images.to(model_engine.local_rank)
 
-            loss = opt_forward_and_loss(criterion, images, labels, model_engine)
+            loss, predicted = opt_forward_and_loss(criterion, images, labels, model_engine)
 
             val_loss += loss.item()
+
+            correct += torch.eq(predicted, labels).sum().item()
+            total += predicted.size(0)
 
             if batch_idx == 0:
                 test_images = images[:2]
                 output_labels = model_engine(test_images)
                 examples = (test_images, labels[:2], output_labels[:2])
 
-    return val_loss, examples
+    return val_loss, correct, total, examples
 
 def dict_compare(dict1, dict2):
     # Check if the dictionaries have the same length
@@ -258,7 +264,7 @@ def main(args):
 
         train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, image_dtype)
 
-        val_loss, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine, image_dtype)
+        val_loss, correct, total, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine, image_dtype)
 
         end_time = time.time()
         epoch_time = end_time - start_time
@@ -266,19 +272,25 @@ def main(args):
         # Sync variables between machines
         sum_train_loss = torch.tensor(train_loss).cuda(rank)
         sum_val_loss = torch.tensor(val_loss).cuda(rank)
+        sum_correct = torch.tensor(correct).cuda(rank)
+        sum_total = torch.tensor(total).cuda(rank)
         comm.all_reduce(tensor=sum_train_loss, op=comm.ReduceOp.SUM)
         comm.all_reduce(tensor=sum_val_loss, op=comm.ReduceOp.SUM)
+        comm.all_reduce(tensor=sum_correct, op=comm.ReduceOp.SUM)
+        comm.all_reduce(tensor=sum_total, op=comm.ReduceOp.SUM)
 
         total_train_items = len(train_loader) * num_gpus
         total_val_items = len(val_loader) * num_gpus
         comm.barrier()
         avg_train_loss = sum_train_loss.item() / total_train_items
         avg_val_loss = sum_val_loss.item() / total_val_items
+        val_acc = 100. * sum_correct / sum_total
 
         if is_main_process():
             events = [
                 ("AvgTrainLoss", avg_train_loss, model_engine.global_samples),
-                ("AvgValLoss", avg_val_loss, model_engine.global_samples)
+                ("AvgValLoss", avg_val_loss, model_engine.global_samples),
+                ("ValAcc", val_acc, model_engine.global_samples)
             ]
             for event in events:
                 tensorboard.add_scalar(*event)
@@ -294,19 +306,20 @@ def main(args):
             tensorboard.add_histogram('output0', output_labels[0], global_step=epoch)
             tensorboard.add_histogram('output1', output_labels[1], global_step=epoch)
 
-            log_0(f"Epoch {epoch + 1} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Time: {epoch_time:.2f} seconds")
+            log_0(f"Epoch {epoch + 1} - TrainLoss={avg_train_loss:.4f}, ValLoss={avg_val_loss:.4f}, ValAcc={val_acc:.2f}%, Time={epoch_time:.2f} sec")
 
         # Check if validation loss has improved
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_without_improvement = 0
 
-            log_0(f'New best validation loss: {best_val_loss:.4f}')
+            log_0(f'New best validation loss: {best_val_loss:.4f}  Validation accuracy: {val_acc:.2f}%')
 
             client_state = {
                 'train_version': 1,
                 'avg_train_loss': avg_train_loss,
                 'avg_val_loss': avg_val_loss,
+                'val_acc': val_acc,
                 'epoch': epoch,
                 'crop_w': crop_w,
                 'crop_h': crop_h,
@@ -320,7 +333,7 @@ def main(args):
                 saved_state_dict = model_engine.state_dict()
                 fixed_state_dict = {key.replace("module.", ""): value for key, value in saved_state_dict.items()}
                 torch.save(fixed_state_dict, args.output_model)
-                log_0(f"Wrote model to {args.output_model} with val_loss={best_val_loss:.4f}")
+                log_0(f"Wrote model to {args.output_model} with val_loss={best_val_loss:.4f}, val_acc={val_acc:.2f}%")
         else:
             epochs_without_improvement += 1
 
@@ -330,7 +343,7 @@ def main(args):
                 break
 
     if is_main_process():
-        log_0(f'Training complete.  Best model was written to {args.output_model}  Final best validation loss: {best_val_loss}')
+        log_0(f'Training complete.  Best model was written to {args.output_model}  Final best validation loss: {best_val_loss}, accuracy: {val_acc:.2f}%')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
