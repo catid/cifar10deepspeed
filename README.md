@@ -69,7 +69,7 @@ conda activate train
 ./tensorboard.sh
 ```
 
-If you restart training you may need to restart the tensorboard.
+Tensorboard has a Dark Mode, refresh button, and auto-refresh in the upper right.  There's also a pin button for the ValAcc graph to put it on top.  If you restart training, you will need to restart the tensorboard server.
 
 
 ## Evaluate

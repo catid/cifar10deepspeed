@@ -289,8 +289,8 @@ def main(args):
         if is_main_process():
             events = [
                 ("AvgTrainLoss", avg_train_loss, model_engine.global_samples),
+                ("ValAcc", val_acc, model_engine.global_samples),
                 ("AvgValLoss", avg_val_loss, model_engine.global_samples),
-                ("ValAcc", val_acc, model_engine.global_samples)
             ]
             for event in events:
                 tensorboard.add_scalar(*event)
