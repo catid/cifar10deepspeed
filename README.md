@@ -1,6 +1,6 @@
-# CIFAR10 with DeepSpeed and DALI
+# CIFAR-10 with DeepSpeed and DALI
 
-The goal of this project is to train a transformer architecture on the CIFAR10 task using Microsoft DeepSpeed and Nvidia DALI for faster training.
+The goal of this project is to train a transformer architecture on the CIFAR-10 task using Microsoft DeepSpeed and Nvidia DALI for faster training.
 
 I would like to use this as a scalable training script for exploring modifications to transformer architecture with faster iteration speed.
 
