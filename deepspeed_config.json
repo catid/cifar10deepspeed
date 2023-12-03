@@ -19,7 +19,7 @@
     "tensorboard": {
       "enabled": false,
       "output_path": "logs",
-      "job_name": "upsampling.deepspeed"
+      "job_name": "cifar100.deepspeed"
     },
     "optimizer": {
       "type": "AdamW",

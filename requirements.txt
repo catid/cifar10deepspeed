@@ -2,7 +2,7 @@
 gdown
 
 # Training pipeline
-torch
 deepspeed
 tensorboard
+Pillow
 einops

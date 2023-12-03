@@ -60,18 +60,21 @@ def is_main_process():
 def ref_forward_and_loss(criterion, data, labels, model_engine):
     # DeepSpeed: forward + backward + optimize
     outputs = model_engine(data)
-    return criterion.forward(outputs, labels)
+    return criterion(outputs, labels)
 
-def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine):
+def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine, image_dtype):
     train_loss = 0.0
 
     model_engine.train()
 
     with torch.set_grad_enabled(True):
-        for batch_idx, (label, target, data) in enumerate(train_loader):
-            data, target = data.to(model_engine.local_rank), target.to(model_engine.local_rank)
+        for batch_idx, (labels, images) in enumerate(train_loader):
+            images = images.to(image_dtype)
+            labels = labels.squeeze().to(torch.long)
 
-            loss = opt_forward_and_loss(criterion, data, target, model_engine)
+            labels, images = labels.to(model_engine.local_rank), images.to(model_engine.local_rank)
+
+            loss = opt_forward_and_loss(criterion, images, labels, model_engine)
 
             model_engine.backward(loss)
             model_engine.step()
@@ -81,21 +84,24 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine)
     return train_loss
 
 
-def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engine):
+def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engine, image_dtype):
     val_loss = 0.0
 
     model_engine.eval()
 
     with torch.set_grad_enabled(False):
-        for batch_idx, (labels, data) in enumerate(val_loader):
-            labels, data = labels.to(model_engine.local_rank), data.to(model_engine.local_rank)
+        for batch_idx, (labels, images) in enumerate(val_loader):
+            images = images.to(image_dtype)
+            labels = labels.squeeze().to(torch.long)
 
-            loss = opt_forward_and_loss(criterion, data, labels, model_engine)
+            labels, images = labels.to(model_engine.local_rank), images.to(model_engine.local_rank)
+
+            loss = opt_forward_and_loss(criterion, images, labels, model_engine)
 
             val_loss += loss.item()
 
             if batch_idx == 0:
-                test_images = data[:2]
+                test_images = images[:2]
                 output_labels = model_engine(test_images)
                 examples = (test_images, labels[:2], output_labels[:2])
 
@@ -166,6 +172,11 @@ def main(args):
     fp16 = model_engine.fp16_enabled()
     log_0(f'model_engine.fp16_enabled={fp16}')
 
+    if fp16:
+        image_dtype = torch.float16
+    else:
+        image_dtype = torch.float32
+
     rank = model_engine.local_rank
     shard_id = model_engine.global_rank
     num_gpus = model_engine.world_size
@@ -213,7 +224,7 @@ def main(args):
     criterion.cuda(rank)
 
     forward_and_loss = ref_forward_and_loss
-    forward_and_loss = dynamo.optimize("eager")(forward_and_loss)
+    #forward_and_loss = dynamo.optimize("eager")(forward_and_loss)
 
     # Initialize training
 
@@ -247,9 +258,9 @@ def main(args):
     for epoch in range(start_epoch, args.max_epochs):
         start_time = time.time()
 
-        train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine)
+        train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, image_dtype)
 
-        val_loss, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine)
+        val_loss, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine, image_dtype)
 
         end_time = time.time()
         epoch_time = end_time - start_time
@@ -279,9 +290,11 @@ def main(args):
             input_labels = examples[1]
             output_labels = examples[2]
 
-            tensorboard.add_images('input', input_images, epoch)
-            tensorboard.add_images('labels', input_labels, epoch)
-            tensorboard.add_images('output', output_labels, epoch)
+            tensorboard.add_images('input', input_images, global_step=epoch)
+            tensorboard.add_scalar('label0', input_labels[0], global_step=epoch)
+            tensorboard.add_scalar('label1', input_labels[1], global_step=epoch)
+            tensorboard.add_histogram('output0', output_labels[0], global_step=epoch)
+            tensorboard.add_histogram('output1', output_labels[1], global_step=epoch)
 
             log_0(f"Epoch {epoch + 1} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Time: {epoch_time:.2f} seconds")
 
