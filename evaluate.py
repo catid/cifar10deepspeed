@@ -101,6 +101,7 @@ def evaluate(model, dataset_dir, fp16=True):
         test_loss += loss.item()
         total += 1
 
+    logger.info(f"Test loss = {test_loss/total}")
     logger.info(f"Test accuracy: {100.*correct/total}%")
 
 # Entrypoint
