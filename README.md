@@ -83,10 +83,20 @@ Tensorboard has a Dark Mode, refresh button, and auto-refresh in the upper right
 To run a hyperparameter sweep for the baseline model:
 
 ```bash
-./scripts/run_experiment_baseline.sh
+conda activate train
+./scripts/exp_baseline_mlp_dim.sh
 ```
 
 This will produce results in results.txt you can graph by parsing the text file.
+
+You can watch the (very slow) progress in another tmux window:
+
+```bash
+# In case the file is not created yet
+touch results.txt
+
+tail -f results.txt
+```
 
 
 ## Evaluate
