@@ -72,7 +72,7 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
             images = images.to(image_dtype)
             labels = labels.squeeze().to(torch.long)
 
-            log_all(f"train_one_epoch: batch_idx = {batch_idx} labels[:4] = {labels[:4]}")
+            #log_all(f"train_one_epoch: batch_idx = {batch_idx} labels[:4] = {labels[:4]}")
 
             labels, images = labels.to(model_engine.local_rank), images.to(model_engine.local_rank)
 
@@ -96,7 +96,7 @@ def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engi
             images = images.to(image_dtype)
             labels = labels.squeeze().to(torch.long)
 
-            log_all(f"validation_one_epoch: batch_idx = {batch_idx} labels[:4] = {labels[:4]}")
+            #log_all(f"validation_one_epoch: batch_idx = {batch_idx} labels[:4] = {labels[:4]}")
 
             labels, images = labels.to(model_engine.local_rank), images.to(model_engine.local_rank)
 
