@@ -8,7 +8,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch._dynamo as dynamo
 
 import deepspeed
 from deepspeed import comm
@@ -149,9 +148,6 @@ def main(args):
     # Model and optimizer
     model = select_model(args)
 
-    torch._dynamo.config.verbose = False
-    torch._dynamo.config.suppress_errors = True
-
     # DeepSpeed engine
     model_engine, optimizer, _, _ = deepspeed.initialize(
         args=args,
@@ -228,7 +224,10 @@ def main(args):
     criterion.cuda(rank)
 
     forward_and_loss = ref_forward_and_loss
-    #forward_and_loss = dynamo.optimize("eager")(forward_and_loss)
+
+    # The time this takes to compile sadly offsets the time it saves
+    # Without dynamic=True it actually takes *longer* overall
+    forward_and_loss = torch.compile(forward_and_loss, dynamic=True, fullgraph=False)
 
     # Initialize training
 

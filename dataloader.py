@@ -46,7 +46,7 @@ def png_pipeline(data_dir=None, file_list=None, mode="training", crop_w=32, crop
         angle = fn.random.coin_flip(probability=0.2) * fn.random.uniform(range=(1, 4), dtype=dali.types.INT32) * 90.0
         images = fn.rotate(images, device="gpu", angle=angle)
 
-        images = fn.random_resized_crop(images, size=(crop_h, crop_w), random_area=[0.25, 1.0], random_aspect_ratio=[1.0, 1.0])
+        images = fn.random_resized_crop(images, size=(crop_h, crop_w), random_area=[0.2, 1.0], random_aspect_ratio=[0.75, 1.25])
 
         # Convert to NCHW
         normalized_full_images = fn.transpose(images, device="gpu", perm=[2, 0, 1])
