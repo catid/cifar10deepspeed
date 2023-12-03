@@ -13,6 +13,12 @@ cd cifar100deepspeed
 conda create -n train python=3.10
 conda activate train
 
+# Update this from https://pytorch.org/get-started/locally/
+pip3 install --upgrade torch torchvision functorch --extra-index-url https://download.pytorch.org/whl/cu118
+
+# Update this from https://github.com/NVIDIA/DALI#installing-dali
+pip install --upgrade nvidia-dali-cuda110 --extra-index-url https://developer.download.nvidia.com/compute/redist
+
 pip install -U -r requirements.txt
 
 # Extract the dataset and produce labels
