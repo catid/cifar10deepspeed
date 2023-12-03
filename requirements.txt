@@ -1,0 +1,7 @@
+# Downloading dataset
+gdown
+
+# Training pipeline
+deepspeed
+tensorboard
+einops
