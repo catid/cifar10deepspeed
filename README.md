@@ -4,6 +4,8 @@ The goal of this project is to train a transformer architecture on the CIFAR-10 
 
 I would like to use this as a scalable training script for exploring modifications to transformer architecture with faster iteration speed.
 
+This repo uses about half as many epochs, each running about 50% faster, so about 3x faster overall, to train the same model with 3% higher accuracy scores than the vision-transformers-cifar10 repo.
+
 ## Setup
 
 Install conda: https://docs.conda.io/projects/miniconda/en/latest/index.html
@@ -81,10 +83,10 @@ conda activate train
 python evaluate.py
 
 (train) ➜  cifar10deepspeed git:(main) ✗ python evaluate.py
-2023-12-03 08:21:18,315 [INFO] Loading as FP16: True
-Evaluating: 100%|███████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 6119.13it/s]
-2023-12-03 08:21:20,410 [INFO] Test loss = 0.58546015625
-2023-12-03 08:21:20,411 [INFO] Test accuracy: 81.02%
+2023-12-03 09:23:30,619 [INFO] Loading as FP16: True
+Evaluating: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 6074.96it/s]
+2023-12-03 09:23:32,723 [INFO] Test loss = 0.51888203125
+2023-12-03 09:23:32,723 [INFO] Test accuracy: 84.62%
 ```
 
 This will print the accuracy % on the test set.  As a sanity check it also reports the test loss of the model, which should match the epoch where it was sampled from during training.
