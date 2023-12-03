@@ -314,24 +314,23 @@ def main(args):
                 'model_params': params
             }
             model_engine.save_checkpoint(save_dir=args.output_dir, client_state=client_state)
-            log_all(f'Saved new best checkpoint')
 
             if is_main_process():
                 # Write output .pth file
                 saved_state_dict = model_engine.state_dict()
                 fixed_state_dict = {key.replace("module.", ""): value for key, value in saved_state_dict.items()}
                 torch.save(fixed_state_dict, args.output_model)
-                print(f"Wrote model to {args.output_model}")
+                log_0(f"Wrote model to {args.output_model} with val_loss={best_val_loss:.4f}")
         else:
             epochs_without_improvement += 1
 
             # Early stopping condition
             if epochs_without_improvement >= args.patience:
-                log_0(f"Early stopping at epoch {epoch}, best validation loss: {best_val_loss}")
+                log_0(f"Early stopping at epoch {epoch}, best validation loss: {best_val_loss:.4f}")
                 break
 
     if is_main_process():
-        log_0(f'Training complete.  Final validation loss: {avg_val_loss}')
+        log_0(f'Training complete.  Best model was written to {args.output_model}  Final best validation loss: {best_val_loss}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
