@@ -1,6 +1,6 @@
 def parse_config_string(config_str):
     config_dict = {}
-    pairs = config_str.split()  # Split the string into key-value pairs
+    pairs = config_str.split(',')  # Split the string into key-value pairs
 
     for pair in pairs:
         key, value = pair.split('=')  # Split each pair by '=' to get key and value

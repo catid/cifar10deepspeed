@@ -417,7 +417,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--name", type=str, default="", help="Give your experiment a name")
     parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture defined in models/model_loader.py")
-    parser.add_argument("--params", type=str, default="dim=512 depth=4 heads=6 mlp_dim=256", help="Model architecture parameters defined in models/model_loader.py")
+    parser.add_argument("--params", type=str, default="dim=512,depth=4,heads=6,mlp_dim=256", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
     parser.add_argument("--max-epochs", type=int, default=400, help="Maximum epochs to train")

@@ -78,6 +78,17 @@ conda activate train
 Tensorboard has a Dark Mode, refresh button, and auto-refresh in the upper right.  There's also a pin button for the ValAcc graph to put it on top.  If you restart training, you will need to restart the tensorboard server.
 
 
+## Batch experiments
+
+To run a hyperparameter sweep for the baseline model:
+
+```bash
+./scripts/run_experiment_baseline.sh
+```
+
+This will produce results in results.txt you can graph by parsing the text file.
+
+
 ## Evaluate
 
 ```bash
