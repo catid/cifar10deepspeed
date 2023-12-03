@@ -18,14 +18,16 @@ import argparse
 
 from model.vit_small import ViT
 
-from data_loader import UpsamplingDataLoader
-#from ffcv_data_loader import FfcvUpsamplingDataLoader
+from dataloader import CifarDataLoader
 
 from deepspeed.runtime.config import DeepSpeedConfig
 
-import nni
-
 from torch.utils.tensorboard import SummaryWriter
+
+
+
+def select_model(args):
+    return ViT()
 
 
 def log_0(msg):
@@ -46,31 +48,10 @@ torch.autograd.profiler.profile(False)
 def is_main_process():
     return comm.get_rank() == 0
 
-def ref_forward_and_loss_fp16(criterion, data, target, model_engine):
+def ref_forward_and_loss(criterion, data, labels, model_engine):
     # DeepSpeed: forward + backward + optimize
-    output = model_engine(data)
-
-    # During training, the model produces NCHW FP16 -1..1 RGB images.
-    # Target is a NCHW uint8 RGB image.  Convert to FP16 -1..1 RGB images.
-    target = target.half()
-    target = target / 127.5 - 1.0
-    target = target.clamp(-1, 1)
-
-    l1_loss = criterion.forward(output, target)
-    return l1_loss
-
-def ref_forward_and_loss_fp32(criterion, data, target, model_engine):
-    # DeepSpeed: forward + backward + optimize
-    output = model_engine(data)
-
-    # During training, the model produces NCHW FP16 -1..1 RGB images.
-    # Target is a NCHW uint8 RGB image.  Convert to FP16 -1..1 RGB images.
-    target = target.float()
-    target = target / 127.5 - 1.0
-    target = target.clamp(-1, 1)
-
-    l1_loss = criterion.forward(output, target)
-    return l1_loss
+    outputs = model_engine(data)
+    return criterion.forward(outputs, labels)
 
 def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine):
     train_loss = 0.0
@@ -97,19 +78,19 @@ def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engi
     model_engine.eval()
 
     with torch.set_grad_enabled(False):
-        for batch_idx, (label, target, data) in enumerate(val_loader):
-            data, target = data.to(model_engine.local_rank), target.to(model_engine.local_rank)
+        for batch_idx, (labels, data) in enumerate(val_loader):
+            labels, data = labels.to(model_engine.local_rank), data.to(model_engine.local_rank)
 
-            loss = opt_forward_and_loss(criterion, data, target, model_engine)
+            loss = opt_forward_and_loss(criterion, data, labels, model_engine)
 
             val_loss += loss.item()
 
             if batch_idx == 0:
                 test_images = data[:2]
-                result_images = model_engine(test_images)
-                example_images = (test_images, target[:2], result_images)
+                output_labels = model_engine(test_images)
+                examples = (test_images, labels[:2], output_labels[:2])
 
-    return val_loss, example_images
+    return val_loss, examples
 
 def dict_compare(dict1, dict2):
     # Check if the dictionaries have the same length
@@ -131,12 +112,18 @@ def delete_folder_contents(folder_path):
     shutil.rmtree(folder_path)
     os.makedirs(folder_path)
 
+def get_absolute_path(relative_path):
+    # Get the directory of the script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Construct the absolute path
+    absolute_path = os.path.abspath(os.path.join(script_dir, relative_path))
+
+    return absolute_path
+
 def main(args):
-    if args.nni:
-        params = nni.get_next_parameter()
-    else:
-        params = {}
-        params['learning_rate'] = 0.001
+    params = {}
+    params['learning_rate'] = 0.001
 
     torch.manual_seed(42)
     np.random.seed(0)
@@ -148,7 +135,7 @@ def main(args):
     )
 
     # Model and optimizer
-    model = create_vapsr2x(rgb8output=False)
+    model = select_model(args)
 
     torch._dynamo.config.verbose = False
     torch._dynamo.config.suppress_errors = True
@@ -160,7 +147,7 @@ def main(args):
         #config_params=args.deepspeed_config,  <- This should be in the args
         model_parameters=model.parameters())
 
-    log_dir = f"{args.log_dir}/upsampling"
+    log_dir = f"{args.log_dir}/cifar100"
     os.makedirs(log_dir, exist_ok=True)
     if args.reset:
         log_0("Resetting training - deleting Tensorboard directory")
@@ -181,75 +168,42 @@ def main(args):
 
     num_loader_threads = os.cpu_count()//2
     seed = 0
-    downsample_factor = 2
-    crop_w = 256
-    crop_h = 256
+    crop_w = 32
+    crop_h = 32
 
-    if True:
-        train_loader = UpsamplingDataLoader(
-            batch_size=data_loader_batch_size,
-            device_id=rank,
-            num_threads=num_loader_threads,
-            seed=seed,
-            file_list=os.path.join(args.dataset_dir, "training_file_list.txt"),
-            mode='training',
-            downsample_factor=downsample_factor,
-            crop_w=crop_w,
-            crop_h=crop_h,
-            shard_id=shard_id,
-            num_shards=num_gpus)
+    dataset_dir = get_absolute_path(args.dataset_dir)
+    log_all(f"Loading dataset from: {dataset_dir}")
 
-        val_loader = UpsamplingDataLoader(
-            batch_size=data_loader_batch_size,
-            device_id=rank,
-            num_threads=num_loader_threads,
-            seed=seed,
-            file_list=os.path.join(args.dataset_dir, "validation_file_list.txt"),
-            mode='validation',
-            downsample_factor=downsample_factor,
-            crop_w=crop_w,
-            crop_h=crop_h,
-            shard_id=shard_id,
-            num_shards=num_gpus)
-    else:
-        train_loader = FfcvUpsamplingDataLoader(
-            batch_size=data_loader_batch_size,
-            device_id=rank,
-            num_threads=num_loader_threads,
-            seed=seed,
-            data_file=str(Path.home() / "ffcv_dataset"),
-            mode='training',
-            downsample_factor=downsample_factor,
-            crop_w=crop_w,
-            crop_h=crop_h,
-            shard_id=shard_id,
-            num_shards=num_gpus)
+    train_loader = CifarDataLoader(
+        batch_size=data_loader_batch_size,
+        device_id=rank,
+        num_threads=num_loader_threads,
+        seed=seed,
+        file_list=os.path.join(dataset_dir, "training_file_list.txt"),
+        mode='training',
+        crop_w=crop_w,
+        crop_h=crop_h,
+        shard_id=shard_id,
+        num_shards=num_gpus)
 
-        val_loader = FfcvUpsamplingDataLoader(
-            batch_size=data_loader_batch_size,
-            device_id=rank,
-            num_threads=num_loader_threads,
-            seed=seed,
-            data_file=str(Path.home() / "ffcv_dataset"),
-            mode='validation',
-            downsample_factor=downsample_factor,
-            crop_w=crop_w,
-            crop_h=crop_h,
-            shard_id=shard_id,
-            num_shards=num_gpus)
+    val_loader = CifarDataLoader(
+        batch_size=data_loader_batch_size,
+        device_id=rank,
+        num_threads=num_loader_threads,
+        seed=seed,
+        file_list=os.path.join(dataset_dir, "validation_file_list.txt"),
+        mode='validation',
+        crop_w=crop_w,
+        crop_h=crop_h,
+        shard_id=shard_id,
+        num_shards=num_gpus)
 
     # Loss functions
 
-    if args.mse:
-        criterion = nn.MSELoss()
-    else:
-        criterion = nn.L1Loss()
+    criterion = nn.CrossEntropyLoss()
     criterion.cuda(rank)
 
-    if fp16:
-        forward_and_loss = ref_forward_and_loss_fp16
-    else:
-        forward_and_loss = ref_forward_and_loss_fp32
+    forward_and_loss = ref_forward_and_loss
     forward_and_loss = dynamo.optimize("eager")(forward_and_loss)
 
     # Initialize training
@@ -286,13 +240,10 @@ def main(args):
 
         train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine)
 
-        val_loss, example_images = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine)
+        val_loss, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine)
 
         end_time = time.time()
         epoch_time = end_time - start_time
-
-        if args.nni:
-            nni.report_intermediate_result(avg_val_loss)
 
         # Sync variables between machines
         sum_train_loss = torch.tensor(train_loss).cuda(rank)
@@ -315,20 +266,13 @@ def main(args):
                 tensorboard.add_scalar(*event)
 
             # Note: Tensorboard needs NCHW uint8
-            input_images = example_images[0]
-            target_images = example_images[1]
-
-            # During training, the model produces FP16 -1..1 RGB images.
-            # Convert to NCHW uint8 0..255 RGB images for display.
-            output_images = example_images[2]
-
-            output_images = output_images * 127.5 + 128
-            output_images = torch.clamp(output_images, 0, 255)
-            output_images = output_images.to(torch.uint8)
+            input_images = examples[0]
+            input_labels = examples[1]
+            output_labels = examples[2]
 
             tensorboard.add_images('input', input_images, epoch)
-            tensorboard.add_images('target', target_images, epoch)
-            tensorboard.add_images('output', output_images, epoch)
+            tensorboard.add_images('labels', input_labels, epoch)
+            tensorboard.add_images('output', output_labels, epoch)
 
             log_0(f"Epoch {epoch + 1} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Time: {epoch_time:.2f} seconds")
 
@@ -362,21 +306,15 @@ def main(args):
     if is_main_process():
         log_0(f'Training complete.  Final validation loss: {avg_val_loss}')
 
-    # Report final validation loss
-    if args.nni:
-        nni.report_final_result(avg_val_loss)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--local_rank", type=int, default=-1)
-    parser.add_argument("--dataset-dir", type=str, default=str(Path.home() / "dataset"), help="Path to the dataset directory (default: ~/dataset/)")
+    parser.add_argument("--dataset-dir", type=str, default=str("cifar100"), help="Path to the dataset directory (default: ./cifar100/)")
     parser.add_argument("--max-epochs", type=int, default=1000000, help="Maximum epochs to train")
-    parser.add_argument("--patience", type=int, default=200, help="Patience for validation loss not decreasing before early stopping")
-    parser.add_argument("--nni", action="store_true", help="Enable NNI mode")
+    parser.add_argument("--patience", type=int, default=100, help="Patience for validation loss not decreasing before early stopping")
     parser.add_argument("--output-dir", type=str, default="output_model", help="Path to the output trained model")
     parser.add_argument("--log-dir", type=str, default="tb_logs", help="Path to the Tensorboard logs")
     parser.add_argument("--reset", action="store_true", help="Reset training from scratch")
-    parser.add_argument("--mse", action="store_true", help="Use MSE instead of L1 loss")
 
     parser = deepspeed.add_config_arguments(parser)
 

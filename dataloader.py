@@ -1,3 +1,5 @@
+# This uses Nvidia DALI to batch load the images/labels
+
 import tools.normalization_factors
 
 import os
@@ -80,7 +82,7 @@ def png_pipeline(data_dir=None, file_list=None, mode="training", crop_w=32, crop
 
 class CustomDALIIterator(dali_torch.DALIGenericIterator):
     def __init__(self, pipelines, *args, **kwargs):
-        super(CustomDALIIterator, self).__init__(pipelines, ["labels", "full", "down"], *args, **kwargs)
+        super(CustomDALIIterator, self).__init__(pipelines, ["labels", "full"], *args, **kwargs)
 
     def __next__(self):
         out = super().__next__()
@@ -89,13 +91,12 @@ class CustomDALIIterator(dali_torch.DALIGenericIterator):
         # Extract the downsampled and upsampled images from the output
         labels = out["labels"]
         full = out["full"]
-        down = out["down"]
 
-        return labels, full, down
+        return labels, full
 
-class UpsamplingDataLoader:
+class CifarDataLoader:
     def __init__(self, batch_size, device_id, num_threads, seed, data_dir=None, file_list=None, mode='training',
-                    downsample_factor=2, crop_w=256, crop_h=256, shard_id=1, num_shards=1):
+                    crop_w=32, crop_h=32, shard_id=1, num_shards=1):
         self.pipeline = png_pipeline(
             batch_size=batch_size,
             num_threads=num_threads,
@@ -106,7 +107,6 @@ class UpsamplingDataLoader:
             data_dir=data_dir,
             file_list=file_list,
             mode=mode,
-            downsample_factor=downsample_factor,
             crop_w=crop_w,
             crop_h=crop_h)
         self.pipeline.build()
