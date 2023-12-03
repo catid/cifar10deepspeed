@@ -134,7 +134,8 @@ def get_absolute_path(relative_path):
 import subprocess
 from datetime import datetime
 
-def record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch):
+def record_experiment(args, best_train_loss, best_val_loss, best_val_acc,
+                      end_epoch, dt):
     git_hash = "Git hash unavailable"
     try:
         git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
@@ -152,6 +153,7 @@ def record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_ep
     data["best_train_loss"] = best_train_loss
     data["best_val_loss"] = best_val_loss
     data["end_epoch"] = end_epoch
+    data["train_seconds"] = dt
     data["git_hash"] = git_hash
     data["timestamp"] = datetime_string
     data["seed"] = args.seed
@@ -189,6 +191,8 @@ def synchronize_seed(args, rank, shard_id):
 
 
 def main(args):
+    t0 = time.time()
+
     params = {}
     #params['learning_rate'] = 0.001
 
@@ -405,7 +409,10 @@ def main(args):
     if is_main_process():
         log_0(f'Training complete.  Best model was written to {args.output_model}  Final best validation loss: {best_val_loss}, best validation accuracy: {best_val_acc:.2f}%')
 
-        record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch)
+        t1 = time.time()
+        dt = t1 - t0
+
+        record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt)
 
 def get_true_random_32bit_positive_integer():
     random_bytes = bytearray(os.urandom(4))
