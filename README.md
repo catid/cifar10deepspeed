@@ -4,7 +4,7 @@ The goal of this project is to train a transformer architecture on the CIFAR-10 
 
 I would like to use this as a scalable training script for exploring modifications to transformer architecture with faster iteration speed.
 
-This repo uses about half as many epochs, each running about 50% faster, so about 3x faster overall, to train the same model with 3% higher accuracy scores than the vision-transformers-cifar10 repo.
+As compared to the `vision-transformers-cifar10` repo: This repo uses about half as many epochs, each running about 2x faster, so about 4x faster overall, to train the same model with 3% higher accuracy scores.
 
 ## Setup
 
