@@ -78,6 +78,10 @@ def evaluate(model, dataset_dir, fp16=True):
     correct = 0
     total = 0
 
+    batch_input_tensors = []
+    batch_label_tensors = []
+    batch_size = 256
+
     for file_path, label in tqdm(data, "Evaluating"):
         input_image = Image.open(file_path).convert("RGB")
 
@@ -87,19 +91,43 @@ def evaluate(model, dataset_dir, fp16=True):
             input_tensor = input_tensor.to(torch.float16)
         else:
             input_tensor = input_tensor.to(torch.float32)
-        input_tensor = input_tensor.to(device)
 
         label_tensor = torch.tensor([label]).to(torch.long).to(device)
 
-        with torch.no_grad():
-            result_tensor = model(input_tensor)
-            loss = criterion(result_tensor, label_tensor)
+        batch_input_tensors.append(input_tensor)
+        batch_label_tensors.append(label_tensor)
 
-        _, predicted = result_tensor.max(1)
-        if predicted == label:
-            correct += 1
-        test_loss += loss.item()
-        total += 1
+        if len(batch_input_tensors) == batch_size:
+            # Convert lists to tensors and concatenate
+            inputs = torch.cat(batch_input_tensors, dim=0).to(device)
+            labels = torch.cat(batch_label_tensors, dim=0).to(device)
+
+            with torch.no_grad():
+                results = model(inputs)
+                loss = criterion(results, labels)
+                _, predicted = results.max(1)
+
+            correct += (predicted == labels).sum().item()
+            test_loss += loss.item() * inputs.size(0)
+            total += inputs.size(0)
+
+            # Clear lists for next batch
+            batch_input_tensors = []
+            batch_label_tensors = []
+
+    # Process the last batch if it has fewer than batch_size elements
+    if batch_input_tensors:
+        inputs = torch.cat(batch_input_tensors, dim=0).to(device)
+        labels = torch.cat(batch_label_tensors, dim=0).to(device)
+
+        with torch.no_grad():
+            results = model(inputs)
+            loss = criterion(results, labels)
+            _, predicted = results.max(1)
+
+        correct += (predicted == labels).sum().item()
+        test_loss += loss.item() * inputs.size(0)
+        total += inputs.size(0)
 
     logger.info(f"Test loss = {test_loss/total}")
     logger.info(f"Test accuracy: {100.*correct/total}%")
