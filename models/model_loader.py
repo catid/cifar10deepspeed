@@ -3,7 +3,7 @@ def select_model(args):
     return ViT(
         image_size = 32,
         patch_size = 4,
-        num_classes = 100,
+        num_classes = 10,
         dim = 512,
         depth = 4,
         heads = 6,

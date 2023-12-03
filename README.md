@@ -1,6 +1,6 @@
-# CIFAR100 with DeepSpeed and DALI
+# CIFAR10 with DeepSpeed and DALI
 
-The goal of this project is to train a transformer architecture on the CIFAR100 task using Microsoft DeepSpeed and Nvidia DALI.
+The goal of this project is to train a transformer architecture on the CIFAR10 task using Microsoft DeepSpeed and Nvidia DALI for faster training.
 
 I would like to use this as a scalable training script for exploring modifications to transformer architecture with faster iteration speed.
 
@@ -26,8 +26,8 @@ nvcc --version
 Setup the software from this repo:
 
 ```bash
-git clone https://github.com/catid/cifar100deepspeed
-cd cifar100deepspeed
+git clone https://github.com/catid/cifar10deepspeed
+cd cifar10deepspeed
 
 conda create -n train python=3.10
 conda activate train
@@ -41,12 +41,12 @@ pip install --upgrade nvidia-dali-cuda110 --extra-index-url https://developer.do
 pip install -U -r requirements.txt
 
 # Extract the dataset and produce labels
-gdown 'https://drive.google.com/uc?id=1MYQyvXFoxakvQBWnGd1NF5iUO23VATj1'
+gdown 'https://drive.google.com/uc?id=1r0Rb7dfex7g3ovRacIvoEbTkXkrgmboe'
 
 # Install the zip/unzip CLI tools
 sudo apt install zip
 
-unzip cifar100.zip
+unzip cifar10.zip
 python prepare_dataset.py
 ```
 
@@ -54,12 +54,20 @@ python prepare_dataset.py
 ## Train
 
 ```bash
+conda activate train
 ./launch_local_train.sh
 ```
 
 On a 3x 3090 GPU rig (down-volted), I'm getting 2.6 seconds per epoch.
 
 If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch, which you should do when changing models.
+
+In another window you can run tensorboard and then navigate to http://gpu1.lan:6006/ to watch the progress of training:
+
+```bash
+conda activate train
+./tensorboard.sh
+```
 
 
 ## Evaluate
@@ -86,7 +94,7 @@ I found that for a 3x 3090 GPU setup with about ~2 Gbps Ethernet between them, i
 
 ## Dataset details
 
-I used this project to download CIFAR100 as image files: https://github.com/knjcode/cifar2png
+I used this project to download CIFAR10 as image files: https://github.com/knjcode/cifar2png
 
 The image files are hosted on my Google Drive here: https://drive.google.com/file/d/1MYQyvXFoxakvQBWnGd1NF5iUO23VATj1/view?usp=sharing
 

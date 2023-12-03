@@ -118,10 +118,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
-    parser.add_argument("--model", type=str, default="cifar100.pth", help="Path to the model file produced by export_trained_model.py")
+    parser.add_argument("--model", type=str, default="cifar10.pth", help="Path to the model file produced by export_trained_model.py")
     parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture (must match model file)")
     parser.add_argument('--fp32', action='store_true', help='Use FP32 network instead of FP16 (only if you trained in fp32 instead)')
-    parser.add_argument("--dataset-dir", type=str, default=str("cifar100"), help="Path to the dataset directory (default: ./cifar100/)")
+    parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
 
     args = parser.parse_args()
 

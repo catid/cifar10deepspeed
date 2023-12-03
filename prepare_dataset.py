@@ -12,7 +12,7 @@ def create_file_list(base_dir, label_dict):
     return file_list
 
 def main():
-    base_dir = 'cifar100'
+    base_dir = 'cifar10'
     train_dir = os.path.join(base_dir, 'train')
     test_dir = os.path.join(base_dir, 'test')
 

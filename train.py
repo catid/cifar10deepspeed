@@ -153,7 +153,7 @@ def main(args):
         #config_params=args.deepspeed_config,  <- This should be in the args
         model_parameters=model.parameters())
 
-    log_dir = f"{args.log_dir}/cifar100"
+    log_dir = f"{args.log_dir}/cifar10"
     os.makedirs(log_dir, exist_ok=True)
 
     torch.distributed.barrier()
@@ -336,13 +336,13 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--local_rank", type=int, default=-1)
-    parser.add_argument("--dataset-dir", type=str, default=str("cifar100"), help="Path to the dataset directory (default: ./cifar100/)")
+    parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
     parser.add_argument("--max-epochs", type=int, default=1000000, help="Maximum epochs to train")
-    parser.add_argument("--patience", type=int, default=100, help="Patience for validation loss not decreasing before early stopping")
+    parser.add_argument("--patience", type=int, default=400, help="Patience for validation loss not decreasing before early stopping")
     parser.add_argument("--output-dir", type=str, default="output_model", help="Path to the output trained model")
     parser.add_argument("--log-dir", type=str, default="tb_logs", help="Path to the Tensorboard logs")
     parser.add_argument("--reset", action="store_true", help="Reset training from scratch")
-    parser.add_argument("--output-model", type=str, default="cifar100.pth", help="Output model file name")
+    parser.add_argument("--output-model", type=str, default="cifar10.pth", help="Output model file name")
 
     parser = deepspeed.add_config_arguments(parser)
 
