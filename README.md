@@ -60,11 +60,11 @@ conda activate train
 ./launch_local_train.sh
 ```
 
-On a 3x 3090 GPU rig (under-volted), I'm getting 1.89 seconds per epoch, which is about 2x faster than the fastest existing repo I've tried.  Note that I'm taking the model with the best validation loss rather than percentage correct, which I think is more correct since the test and validation set are the same, so the % correct result may be slightly lower than other repos report.
-
 The training process will stop after 50 epochs without any improvement in validation loss, which ends up being about 175 epochs, which is about 6 minutes with my hardware.
 
 If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch, which you should do when changing models.
+
+The training script will save the best model to disk during training as a `cifar10.pth` model file.  You can copy this file around to save it for your records to reproduce results.
 
 In another window you can run tensorboard and then navigate to http://gpu1.lan:6006/ to watch the progress of training:
 
