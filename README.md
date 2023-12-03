@@ -59,7 +59,7 @@ python prepare_dataset.py
 
 On a 3x 3090 GPU rig (down-volted), I'm getting 2.6 seconds per epoch.
 
-If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch.
+If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch, which you should do when changing models.
 
 
 ## Evaluate

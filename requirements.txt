@@ -6,3 +6,7 @@ deepspeed
 tensorboard
 Pillow
 einops
+
+# Evaluation
+tqdm
+colorama

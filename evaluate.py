@@ -33,6 +33,7 @@ logger.addHandler(handler)
 from models.model_loader import select_model
 
 import torch
+import torch.nn as nn
 
 def load_model(args, model_path, fp16):
     model = select_model(args)
@@ -51,6 +52,7 @@ def load_model(args, model_path, fp16):
 import os
 from PIL import Image
 import numpy as np
+from tqdm import tqdm
 
 def read_data_file(file_path):
     data = []
@@ -71,11 +73,35 @@ def evaluate(model, dataset_dir, fp16=True):
 
     data = read_data_file(validation_file)
 
-    for file_path, label in data:
+    test_loss = 0
+    criterion = nn.CrossEntropyLoss()
+    correct = 0
+    total = 0
+
+    for file_path, label in tqdm(data, "Evaluating"):
         input_image = Image.open(file_path).convert("RGB")
 
         input_image = np.array(input_image)
-        input_tensor = torch.from_numpy(input_image).unsqueeze(0).permute(0, 3, 1, 2).to(device)
+        input_tensor = torch.from_numpy(input_image).unsqueeze(0).permute(0, 3, 1, 2) / 255.0
+        if fp16:
+            input_tensor = input_tensor.to(torch.float16)
+        else:
+            input_tensor = input_tensor.to(torch.float32)
+        input_tensor = input_tensor.to(device)
+
+        label_tensor = torch.tensor([label]).to(torch.long).to(device)
+
+        with torch.no_grad():
+            result_tensor = model(input_tensor)
+            loss = criterion(result_tensor, label_tensor)
+
+        _, predicted = result_tensor.max(1)
+        if predicted == label:
+            correct += 1
+        test_loss += loss.item()
+        total += 1
+
+    logger.info(f"Test accuracy: {100.*correct/total}%")
 
 # Entrypoint
 
@@ -83,15 +109,15 @@ import argparse
 
 def main(args):
     fp16 = not args.fp32
-    logging.info(f"Loading as FP16: {fp16}")
+    logger.info(f"Loading as FP16: {fp16}")
 
-    model = load_model(args.model, fp16)
+    model = load_model(args, args.model, fp16)
 
     evaluate(model, args.dataset_dir, fp16=fp16)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
-    parser.add_argument("--model", type=str, default="upsampling.pth", help="Path to the model file produced by export_trained_model.py")
+    parser.add_argument("--model", type=str, default="cifar100.pth", help="Path to the model file produced by export_trained_model.py")
     parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture (must match model file)")
     parser.add_argument('--fp32', action='store_true', help='Use FP32 network instead of FP16 (only if you trained in fp32 instead)')
     parser.add_argument("--dataset-dir", type=str, default=str("cifar100"), help="Path to the dataset directory (default: ./cifar100/)")

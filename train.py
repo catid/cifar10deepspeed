@@ -129,7 +129,7 @@ def get_absolute_path(relative_path):
 
 def main(args):
     params = {}
-    params['learning_rate'] = 0.001
+    #params['learning_rate'] = 0.001
 
     torch.manual_seed(42)
     np.random.seed(0)
@@ -315,6 +315,13 @@ def main(args):
             }
             model_engine.save_checkpoint(save_dir=args.output_dir, client_state=client_state)
             log_all(f'Saved new best checkpoint')
+
+            if is_main_process():
+                # Write output .pth file
+                saved_state_dict = model_engine.state_dict()
+                fixed_state_dict = {key.replace("module.", ""): value for key, value in saved_state_dict.items()}
+                torch.save(fixed_state_dict, args.output_model)
+                print(f"Wrote model to {args.output_model}")
         else:
             epochs_without_improvement += 1
 
@@ -335,6 +342,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=str, default="output_model", help="Path to the output trained model")
     parser.add_argument("--log-dir", type=str, default="tb_logs", help="Path to the Tensorboard logs")
     parser.add_argument("--reset", action="store_true", help="Reset training from scratch")
+    parser.add_argument("--output-model", type=str, default="cifar100.pth", help="Output model file name")
 
     parser = deepspeed.add_config_arguments(parser)
 
