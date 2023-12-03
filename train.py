@@ -22,21 +22,7 @@ from deepspeed.runtime.config import DeepSpeedConfig
 
 from torch.utils.tensorboard import SummaryWriter
 
-
-
-def select_model(args):
-    from models.vit_small import ViT
-    return ViT(
-        image_size = 32,
-        patch_size = 4,
-        num_classes = 100,
-        dim = 512,
-        depth = 4,
-        heads = 6,
-        mlp_dim = 256,
-        dropout = 0.1,
-        emb_dropout = 0.1
-    )
+from models.model_loader import select_model
 
 
 def log_0(msg):
@@ -69,7 +55,7 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
 
     with torch.set_grad_enabled(True):
         for batch_idx, (labels, images) in enumerate(train_loader):
-            images = images.to(image_dtype)
+            images = (images / 255.0).to(image_dtype) # Normalize NCHW uint8 input
             labels = labels.squeeze().to(torch.long)
 
             #log_all(f"train_one_epoch: batch_idx = {batch_idx} labels[:4] = {labels[:4]}")
@@ -93,7 +79,7 @@ def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engi
 
     with torch.set_grad_enabled(False):
         for batch_idx, (labels, images) in enumerate(val_loader):
-            images = images.to(image_dtype)
+            images = (images / 255.0).to(image_dtype) # Normalize NCHW uint8 input
             labels = labels.squeeze().to(torch.long)
 
             #log_all(f"validation_one_epoch: batch_idx = {batch_idx} labels[:4] = {labels[:4]}")
@@ -169,9 +155,16 @@ def main(args):
 
     log_dir = f"{args.log_dir}/cifar100"
     os.makedirs(log_dir, exist_ok=True)
+
+    torch.distributed.barrier()
+
     if args.reset:
         log_0("Resetting training - deleting Tensorboard directory")
-        delete_folder_contents(log_dir)
+        if is_main_process():
+            delete_folder_contents(log_dir)
+
+    torch.distributed.barrier()
+
     tensorboard = SummaryWriter(log_dir=log_dir)
 
     fp16 = model_engine.fp16_enabled()

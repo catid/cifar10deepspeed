@@ -57,6 +57,10 @@ python prepare_dataset.py
 ./launch_local_train.sh
 ```
 
+On a 3x 3090 GPU rig (down-volted), I'm getting 2.6 seconds per epoch.
+
+If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch.
+
 
 ## Evaluate
 
@@ -76,6 +80,8 @@ The dataset must be at the same path on each computer participating in the train
 ```bash
 ./launch_distributed_train.sh
 ```
+
+I found that for a 3x 3090 GPU setup with about ~2 Gbps Ethernet between them, it's actually faster to just use one machine for training rather than a cluster.  I haven't tested on my other machines yet, so not sure using a training cluster is ever useful for this problem.
 
 
 ## Dataset details
