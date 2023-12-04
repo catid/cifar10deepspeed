@@ -38,6 +38,8 @@ def render_error_bars_plot(data, png_file_path, x, y, series=None):
 
     plt.savefig(png_file_path, dpi=300)
 
+    print(f"Saved point plot (with error bars) to: {png_file_path}")
+
 def render_scatter_plot(data, png_file_path, x, y, series=None):
     df = pd.DataFrame(data)
 
@@ -58,6 +60,8 @@ def render_scatter_plot(data, png_file_path, x, y, series=None):
     plt.tight_layout()  
 
     plt.savefig(png_file_path, dpi=300)
+
+    print(f"Saved scatter plot to: {png_file_path}")
 
 def main(args):
     experiments = parse_results_file(args.results, upgrade_params=True)
@@ -85,8 +89,6 @@ def main(args):
             render_error_bars_plot(experiments, filename, x="num_params", y="best_val_acc", series=args.series)
         else:
             render_scatter_plot(experiments, filename, x="num_params", y="best_val_acc", series=args.series)
-
-    print("Rendered graphs")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse experiment results from a file")

@@ -13,10 +13,10 @@ def experiments_upgrade_params(experiments):
                 float_value = float(value)
 
                 # If the float value is equivalent to an integer, convert it to int
-                #if float_value.is_integer():
-                #    e[key] = int(float_value)
-                #else:
-                e[key] = float_value
+                if float_value.is_integer():
+                    e[key] = int(float_value)
+                else:
+                    e[key] = float_value
 
             except ValueError:
                 # If conversion fails, keep the original value
