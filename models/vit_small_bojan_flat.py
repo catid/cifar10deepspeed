@@ -10,6 +10,8 @@ from einops.layers.torch import Rearrange
 
 import math
 
+from .bojan_flat import Bojan_Flat_FeedForward
+
 # helpers
 
 def pair(t):
@@ -24,20 +26,6 @@ class PreNorm(nn.Module):
         self.fn = fn
     def forward(self, x, **kwargs):
         return self.fn(self.norm(x), **kwargs)
-
-class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout = 0.):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        y = self.net(x)
-        return y
 
 class LSA(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
@@ -77,7 +65,7 @@ class Transformer(nn.Module):
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
                 PreNorm(dim, LSA(dim, heads = heads, dim_head = dim_head, dropout = dropout)),
-                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
+                PreNorm(dim, Bojan_Flat_FeedForward(dim, mlp_dim, dropout = dropout))
             ]))
     def forward(self, x):
         for attn, ff in self.layers:
@@ -102,7 +90,7 @@ class SPT(nn.Module):
         x_with_shifts = torch.cat((x, *shifted_x), dim = 1)
         return self.to_patch_tokens(x_with_shifts)
 
-class ViT(nn.Module):
+class ViT_BojanFlat(nn.Module):
     def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
         super().__init__()
         image_height, image_width = pair(image_size)
