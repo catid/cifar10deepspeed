@@ -30,13 +30,13 @@ logger.addHandler(handler)
 
 # Model
 
-from models.model_loader import select_model
+from models.model_loader import select_model, params_to_string
 
 import torch
 import torch.nn as nn
 
 def load_model(args, model_path, fp16):
-    model = select_model(args)
+    params, model = select_model(args)
     model.load_state_dict(torch.load(model_path))
     if fp16:
         model.half()
@@ -45,7 +45,7 @@ def load_model(args, model_path, fp16):
     #for name, param in model.named_parameters():
     #    logging.info(f"Name: {name}, Type: {param.dtype}, Size: {param.size()}")
 
-    return model
+    return params, model
 
 # Evaluation
 
@@ -140,13 +140,16 @@ def main(args):
     fp16 = not args.fp32
     logger.info(f"Loading as FP16: {fp16}")
 
-    model = load_model(args, args.model, fp16)
+    params, model = load_model(args, args.model, fp16)
+
+    logger.info(f"Loaded model with parameters: {params_to_string(params)}")
 
     evaluate(model, args.dataset_dir, fp16=fp16)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--model", type=str, default="cifar10.pth", help="Path to the model file produced by export_trained_model.py")
+    parser.add_argument("--params", type=str, default="", help="Parameters to pass to the model loader")
     parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture (must match model file)")
     parser.add_argument('--fp32', action='store_true', help='Use FP32 network instead of FP16 (only if you trained in fp32 instead)')
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")

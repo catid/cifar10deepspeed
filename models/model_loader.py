@@ -1,11 +1,13 @@
 def parse_config_string(config_str):
-    config_dict = {}
     pairs = config_str.split(',')  # Split the string into key-value pairs
 
+    config_dict = {}
     for pair in pairs:
-        key, value = pair.split('=')  # Split each pair by '=' to get key and value
-        config_dict[key] = value  # Convert value to integer and store in dictionary
-
+        try:
+            key, value = pair.split('=')  # Split each pair by '=' to get key and value
+            config_dict[key] = value  # Convert value to integer and store in dictionary
+        except:
+            pass
     return config_dict
 
 def cast_string_to_type(value, target):
@@ -28,6 +30,14 @@ def define_param(params, key, default):
     else:
         params[key] = cast_string_to_type(params[key], default)
 
+def params_to_string(params):
+    s = ""
+    for key in params:
+        if s:
+            s += ","
+        s += key + "=" + str(params[key])
+    return s
+
 def select_model(args):
     params = parse_config_string(args.params)
 
@@ -40,7 +50,7 @@ def select_model(args):
 
         # vit_small
         from models.vit_small import ViT
-        return ViT(
+        return params, ViT(
             image_size = 32,
             patch_size = params["patch_size"],
             num_classes = 10,

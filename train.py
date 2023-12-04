@@ -21,7 +21,7 @@ from deepspeed.runtime.config import DeepSpeedConfig
 
 from torch.utils.tensorboard import SummaryWriter
 
-from models.model_loader import select_model
+from models.model_loader import select_model, params_to_string
 
 
 def log_0(msg):
@@ -134,7 +134,7 @@ def get_absolute_path(relative_path):
 import subprocess
 from datetime import datetime
 
-def record_experiment(args, best_train_loss, best_val_loss, best_val_acc,
+def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc,
                       end_epoch, dt, num_params):
     git_hash = "Git hash unavailable"
     try:
@@ -148,7 +148,7 @@ def record_experiment(args, best_train_loss, best_val_loss, best_val_acc,
     data["name"] = args.name
     data["notes"] = args.notes
     data["arch"] = args.arch
-    data["params"] = args.params
+    data["params"] = params # Note that args.params may not include any default values
     data["best_val_acc"] = best_val_acc
     data["best_train_loss"] = best_train_loss
     data["best_val_loss"] = best_val_loss
@@ -203,7 +203,9 @@ def main(args):
     )
 
     # Model and optimizer
-    model = select_model(args)
+    params, model = select_model(args)
+
+    log_0(f"Selected model with arch={args.arch}, params={params_to_string(params)}")
 
     # DeepSpeed engine
     model_engine, optimizer, _, _ = deepspeed.initialize(
@@ -415,7 +417,7 @@ def main(args):
 
         num_params = sum(p.numel() for p in model.parameters())
 
-        record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt, num_params)
+        record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt, num_params)
 
 def get_true_random_32bit_positive_integer():
     random_bytes = bytearray(os.urandom(4))
@@ -427,7 +429,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--name", type=str, default="", help="Give your experiment a name")
     parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture defined in models/model_loader.py")
-    parser.add_argument("--params", type=str, default="dim=512,depth=4,heads=6,mlp_dim=256", help="Model architecture parameters defined in models/model_loader.py")
+    parser.add_argument("--params", type=str, default="", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
     parser.add_argument("--max-epochs", type=int, default=400, help="Maximum epochs to train")
