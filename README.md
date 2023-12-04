@@ -162,3 +162,4 @@ The dataset must be at the same path on each computer participating in the train
 * Full dense multiply and select output on CPU for training speed
 * Mix or chain CSC-I
 * Add 8 dense rows
+* Ideal Soliton distribution
