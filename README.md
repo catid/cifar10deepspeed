@@ -1,12 +1,13 @@
 # CIFAR-10 with DeepSpeed and DALI
 
-The goal of this project is to train a transformer architecture on the CIFAR-10 task using Microsoft DeepSpeed and Nvidia DALI for faster training.
+The goal of this project is to train a transformer model to solve the CIFAR-10 task using Microsoft DeepSpeed and Nvidia DALI for faster training.
 
 I would like to use this as a scalable training script for exploring modifications to transformer architecture with faster iteration speed.
 
 As compared to the `vision-transformers-cifar10` repo: This repo uses about half as many epochs, each running about 2x faster, so about 4x faster overall, to train the same model with 3% higher accuracy scores.
 
 Experimental runs (git hash, results, all parameters) are recorded to a results text file so that you can run a batch of experiments and then use the results text file to reproduce the results and generate graphs.
+
 
 ## Setup
 
@@ -64,7 +65,7 @@ conda activate train
 
 The training process will stop after 50 epochs without any improvement in validation loss, which ends up being about 175 epochs, which is about 6 minutes with my hardware.
 
-If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch, which you should do when changing models.
+If training is interrupted it will resume from the last checkpoint.  You can pass `--reset` to clear the last checkpoint and train from scratch, which you should do when starting to train a new model.
 
 The training script will save the best model to disk during training as a `cifar10.pth` model file.  You can copy this file around to save it for your records to reproduce results.
 
@@ -107,7 +108,7 @@ You can combine all the `results.txt` files from the machines into one big text 
 python graph.py --results combined_results.txt --name vary_mlp_dim --series mlp_dim
 ```
 
-This is a plot of the performance of the transformer model if you vary the MLP hidden dimension:
+This is a plot of the performance of the transformer model if you vary the MLP hidden dimension, showing error bars for variance across 3 training sessions:
 
 ![Accuracy Variation](docs/graph_acc_vary_mlp_dim_mlp_dim.png)
 
