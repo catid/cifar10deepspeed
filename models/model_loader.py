@@ -38,6 +38,18 @@ def params_to_string(params):
         s += key + "=" + str(params[key])
     return s
 
+def get_model_params(arch_str, params_str):
+    # Convert string to dict
+    params_dict = parse_config_string(params_str)
+
+    # Add any missing dict keys from defaults
+    apply_default_model_params(arch_str, params_dict)
+
+    return params_dict
+
+
+# Define new models here:
+
 def apply_default_model_params(arch, params_dict):
     if arch == "vit_tiny":
         define_param(params_dict, "patch_size", 4)
@@ -58,15 +70,13 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "heads", 6)
         define_param(params_dict, "fff_depth", 7)
         define_param(params_dict, "fff_count", 1)
-
-def get_model_params(arch_str, params_str):
-    # Convert string to dict
-    params_dict = parse_config_string(params_str)
-
-    # Add any missing dict keys from defaults
-    apply_default_model_params(arch_str, params_dict)
-
-    return params_dict
+    if arch == "vit_tiny_2fff":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "dim", 512)
+        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "heads", 6)
+        define_param(params_dict, "fff_depth", 7)
+        define_param(params_dict, "fff_count", 1)
 
 def select_model(args):
     params_dict = get_model_params(args.arch, args.params)
@@ -102,6 +112,21 @@ def select_model(args):
     if args.arch == "vit_tiny_fff":
         from models.vit_small_fff import ViT_FFF
         return params_dict, ViT_FFF(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
+            dim = params_dict["dim"],
+            depth = params_dict["depth"],
+            heads = params_dict["heads"],
+            fff_depth = params_dict["fff_depth"],
+            fff_count = params_dict["fff_count"],
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
+
+    if args.arch == "vit_tiny_2fff":
+        from models.vit_small_2fff import ViT_2FFF
+        return params_dict, ViT_2FFF(
             image_size = 32,
             patch_size = params_dict["patch_size"],
             num_classes = 10,
