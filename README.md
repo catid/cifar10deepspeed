@@ -99,7 +99,24 @@ tail -f results.txt
 ```
 
 
-## Evaluate
+## Graph results
+
+You can combine all the `results.txt` files from the machines into one big text file and then graph the data all together:
+
+```bash
+python graph.py --results combined_results.txt --name vary_mlp_dim --series mlp_dim
+```
+
+This is a plot of the performance of the transformer model if you vary the MLP hidden dimension:
+
+![Accuracy Variation](docs/graph_acc_vary_mlp_dim_mlp_dim.png)
+
+Note that there's a sweet spot at 256, after which it starts getting too big and it's memorizing the training set instead of generalizing.
+
+It's also interesting that by dropping mlp_dim to just 16 from 256, it only uses 6% accuracy on the test set.
+
+
+## Stand-alone evaluation
 
 ```bash
 conda activate train
