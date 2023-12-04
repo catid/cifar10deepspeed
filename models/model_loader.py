@@ -42,7 +42,7 @@ def apply_default_model_params(arch, params_dict):
     if arch == "vit_tiny":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
-        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "depth", 5)
         define_param(params_dict, "heads", 6)
         define_param(params_dict, "mlp_dim", 256)
 
