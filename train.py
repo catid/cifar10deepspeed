@@ -135,7 +135,7 @@ import subprocess
 from datetime import datetime
 
 def record_experiment(args, best_train_loss, best_val_loss, best_val_acc,
-                      end_epoch, dt):
+                      end_epoch, dt, num_params):
     git_hash = "Git hash unavailable"
     try:
         git_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
@@ -154,6 +154,7 @@ def record_experiment(args, best_train_loss, best_val_loss, best_val_acc,
     data["best_val_loss"] = best_val_loss
     data["end_epoch"] = end_epoch
     data["train_seconds"] = dt
+    data["num_params"] = num_params
     data["git_hash"] = git_hash
     data["timestamp"] = datetime_string
     data["seed"] = args.seed
@@ -412,7 +413,9 @@ def main(args):
         t1 = time.time()
         dt = t1 - t0
 
-        record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt)
+        num_params = sum(p.numel() for p in model.parameters())
+
+        record_experiment(args, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt, num_params)
 
 def get_true_random_32bit_positive_integer():
     random_bytes = bytearray(os.urandom(4))
