@@ -10,3 +10,8 @@ einops
 # Evaluation
 tqdm
 colorama
+
+# Analytics
+pandas
+seaborn
+matplotlib
