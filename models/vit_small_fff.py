@@ -1,9 +1,5 @@
 # https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_for_small_dataset.py
 
-# This is a variant of the baseline:
-# We add a FFN layer before and after the attention layer in the transformer.
-# This is based on the macaron paper result: https://arxiv.org/pdf/1906.02762.pdf
-
 from math import sqrt
 import torch
 import torch.nn.functional as F
@@ -13,6 +9,8 @@ from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
 import math
+
+from .fff_bert import FFF
 
 # helpers
 
@@ -28,19 +26,6 @@ class PreNorm(nn.Module):
         self.fn = fn
     def forward(self, x, **kwargs):
         return self.fn(self.norm(x), **kwargs)
-
-class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout = 0.):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.net(x)
 
 class LSA(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
@@ -74,20 +59,18 @@ class LSA(nn.Module):
         return self.to_out(out)
 
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
+    def __init__(self, dim, depth, heads, dim_head, fff_depth, fff_count, dropout = 0.):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout)),
                 PreNorm(dim, LSA(dim, heads = heads, dim_head = dim_head, dropout = dropout)),
-                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout)),
+                PreNorm(dim, FFF(input_width=dim, output_width=dim, depth=fff_depth, parallel_size=fff_count))
             ]))
     def forward(self, x):
-        for ff1, attn, ff2 in self.layers:
-            x = ff1(x) + x
+        for attn, ff in self.layers:
             x = attn(x) + x
-            x = ff2(x) + x
+            x = ff(x) + x
         return x
 
 class SPT(nn.Module):
@@ -107,8 +90,8 @@ class SPT(nn.Module):
         x_with_shifts = torch.cat((x, *shifted_x), dim = 1)
         return self.to_patch_tokens(x_with_shifts)
 
-class ViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
+class ViT_FFF(nn.Module):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, fff_depth, fff_count, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
@@ -125,7 +108,7 @@ class ViT(nn.Module):
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
-        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
+        self.transformer = Transformer(dim, depth, heads, dim_head, fff_depth, fff_count, dropout)
 
         self.pool = pool
         self.to_latent = nn.Identity()
