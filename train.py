@@ -148,7 +148,7 @@ def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc
     data["name"] = args.name
     data["notes"] = args.notes
     data["arch"] = args.arch
-    data["params"] = params # Note that args.params may not include any default values
+    data["params"] = params_to_string(params) # Note that args.params may not include any default values
     data["best_val_acc"] = best_val_acc
     data["best_train_loss"] = best_train_loss
     data["best_val_loss"] = best_val_loss
