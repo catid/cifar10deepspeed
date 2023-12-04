@@ -40,5 +40,14 @@ launch_training
 params="patch_size=4,dim=512,depth=4,heads=6,mlp_dim=32" # no spaces allowed
 launch_training
 
+params="patch_size=4,dim=512,depth=4,heads=6,mlp_dim=24" # no spaces allowed
+launch_training
+
 params="patch_size=4,dim=512,depth=4,heads=6,mlp_dim=16" # no spaces allowed
+launch_training
+
+params="patch_size=4,dim=512,depth=4,heads=6,mlp_dim=12" # no spaces allowed
+launch_training
+
+params="patch_size=4,dim=512,depth=4,heads=6,mlp_dim=8" # no spaces allowed
 launch_training

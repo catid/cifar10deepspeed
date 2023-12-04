@@ -73,28 +73,36 @@ def main(args):
         print("No data matches the filter criterion")
         return
 
-    print(json.dumps(experiments, indent=4))
+    print("Sample experiment result from file: ", json.dumps(experiments[0], indent=4))
 
-    filename = "graph"
+    filename = f"graph_{args.type}"
     if args.name:
         filename += "_" + args.name
     if args.series:
         filename += "_" + args.series
     filename += ".png"
 
+    if args.type == "acc":
+        x="num_params"
+        y="best_val_acc"
+    elif args.type == "time":
+        x="train_seconds"
+        y="best_val_acc"
+
     if not args.series:
-        render_scatter_plot(experiments, filename, x="num_params", y="best_val_acc")
+        render_scatter_plot(experiments, filename, x=x, y=y)
     else:
-        if args.name:
-            render_error_bars_plot(experiments, filename, x="num_params", y="best_val_acc", series=args.series)
+        if args.name and args.type != "time":
+            render_error_bars_plot(experiments, filename, x=x, y=y, series=args.series)
         else:
-            render_scatter_plot(experiments, filename, x="num_params", y="best_val_acc", series=args.series)
+            render_scatter_plot(experiments, filename, x=x, y=y, series=args.series)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse experiment results from a file")
     parser.add_argument("-r", "--results", help="Path to the results file", default="results.txt", nargs="?")
     parser.add_argument("-n", "--name", help="Experiment name to filter on", default="", nargs="?")
     parser.add_argument("-s", "--series", help="Series name", default="", nargs="?")
+    parser.add_argument("-t", "--type", help="Graph type", default="acc", nargs="?")
     args = parser.parse_args()
 
     main(args)
