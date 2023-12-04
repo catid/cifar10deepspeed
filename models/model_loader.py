@@ -24,11 +24,11 @@ def cast_string_to_type(value, target):
     else:
         return target_type(value)  # For other types, use the constructor directly
 
-def define_param(params, key, default):
-    if key not in params:
-        params[key] = default
+def define_param(params_dict, key, default):
+    if key not in params_dict:
+        params_dict[key] = default
     else:
-        params[key] = cast_string_to_type(params[key], default)
+        params_dict[key] = cast_string_to_type(params_dict[key], default)
 
 def params_to_string(params):
     s = ""
@@ -38,26 +38,36 @@ def params_to_string(params):
         s += key + "=" + str(params[key])
     return s
 
+def apply_default_model_params(arch, params_dict):
+    if arch == "vit_tiny":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "dim", 512)
+        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "heads", 6)
+        define_param(params_dict, "mlp_dim", 256)
+
+def get_model_params(arch_str, params_str):
+    # Convert string to dict
+    params_dict = parse_config_string(params_str)
+
+    # Add any missing dict keys from defaults
+    apply_default_model_params(arch_str, params_dict)
+
+    return params_dict
+
 def select_model(args):
-    params = parse_config_string(args.params)
+    params_dict = get_model_params(args.arch, args.params)
 
     if args.arch == "vit_tiny":
-        define_param(params, "patch_size", 4)
-        define_param(params, "dim", 512)
-        define_param(params, "depth", 4)
-        define_param(params, "heads", 6)
-        define_param(params, "mlp_dim", 256)
-
-        # vit_small
         from models.vit_small import ViT
-        return params, ViT(
+        return params_dict, ViT(
             image_size = 32,
-            patch_size = params["patch_size"],
+            patch_size = params_dict["patch_size"],
             num_classes = 10,
-            dim = params["dim"],
-            depth = params["depth"],
-            heads = params["heads"],
-            mlp_dim = params["mlp_dim"],
+            dim = params_dict["dim"],
+            depth = params_dict["depth"],
+            heads = params_dict["heads"],
+            mlp_dim = params_dict["mlp_dim"],
             dropout = 0.1,
             emb_dropout = 0.1
         )

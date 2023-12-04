@@ -1,33 +1,12 @@
 import argparse
 import json
 
-def parse_results(file_path):
-    experiments = []
-    current_experiment = {}
-
-    with open(file_path, 'r') as file:
-        for line in file:
-            line = line.strip()
-            if line.startswith("Experiment:"):
-                if current_experiment:
-                    experiments.append(current_experiment)
-                    current_experiment = {}
-            else:
-                if line:
-                    key, value = line.split(':', 1)
-                    key = key.strip()
-                    value = value.strip()
-                    current_experiment[key] = value
-
-        if current_experiment:
-            experiments.append(current_experiment)
-
-    return experiments
+from results_parser import parse_results_file
 
 def main(args):
-    data = parse_results(args.results)
+    experiments = parse_results_file(args.results, upgrade_params=True)
 
-    print(json.dumps(data, indent=4))
+    print(json.dumps(experiments, indent=4))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse experiment results from a file")

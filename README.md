@@ -87,7 +87,7 @@ conda activate train
 ./scripts/exp_baseline_mlp_dim.sh
 ```
 
-This will produce results in results.txt you can graph by parsing the text file.
+This will produce results in `results.txt` you can graph by parsing the text file.  There is a `results_parser.py` that shows how to parse the `results.txt` file.
 
 You can watch the (very slow) progress in another tmux window:
 
