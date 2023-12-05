@@ -63,6 +63,26 @@ def render_scatter_plot(data, png_file_path, x, y, series=None):
 
     print(f"Saved scatter plot to: {png_file_path}")
 
+def render_lineplot(data, png_file_path, x, y, series):
+    df = pd.DataFrame(data)
+
+    sns.set(style="darkgrid")
+
+    plt.figure(figsize=(12, 8))
+    sns.lineplot(data=df, x=x, y=y, hue=series, palette='deep')
+
+    plt.yticks(rotation=45)  # Rotate Y-axis labels
+
+    plt.title(f"{x} vs {y}")  # Add a title
+    plt.xlabel(f"{x}")  # X-axis label
+    plt.ylabel(f"{y}")  # Y-axis label
+
+    plt.tight_layout()  
+
+    plt.savefig(png_file_path, dpi=300)
+
+    print(f"Saved scatter plot to: {png_file_path}")
+
 def main(args):
     experiments = parse_results_file(args.results, upgrade_params=True)
 
@@ -93,7 +113,7 @@ def main(args):
         render_scatter_plot(experiments, filename, x=x, y=y)
     else:
         if args.name and args.type != "time":
-            render_error_bars_plot(experiments, filename, x=x, y=y, series=args.series)
+            render_lineplot(experiments, filename, x=x, y=y, series=args.series)
         else:
             render_scatter_plot(experiments, filename, x=x, y=y, series=args.series)
 

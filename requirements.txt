@@ -12,6 +12,7 @@ tqdm
 colorama
 
 # Analytics
+lovely-tensors
 pandas
 seaborn
 matplotlib

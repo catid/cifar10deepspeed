@@ -83,6 +83,14 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "heads", 6)
         define_param(params_dict, "fff_depth", 7)
         define_param(params_dict, "fff_count", 1)
+    if arch == "vit_tiny_fff_fanout":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "dim", 512)
+        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "heads", 6)
+        define_param(params_dict, "fff_depth", 1)
+        define_param(params_dict, "fff_count", 1)
+        define_param(params_dict, "fff_fanout", 16)
     if arch == "vit_tiny_2fff":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -170,6 +178,22 @@ def select_model(args):
             heads = params_dict["heads"],
             fff_depth = params_dict["fff_depth"],
             fff_count = params_dict["fff_count"],
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
+
+    if args.arch == "vit_tiny_fff_fanout":
+        from models.vit_small_fff_fanout import ViT_FFF_Fanout
+        return params_dict, ViT_FFF_Fanout(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
+            dim = params_dict["dim"],
+            depth = params_dict["depth"],
+            heads = params_dict["heads"],
+            fff_depth = params_dict["fff_depth"],
+            fff_count = params_dict["fff_count"],
+            fff_fanout = params_dict["fff_fanout"],
             dropout = 0.1,
             emb_dropout = 0.1
         )

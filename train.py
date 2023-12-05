@@ -23,6 +23,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.model_loader import select_model, params_to_string
 
+# Prettify printing tensors when debugging
+import lovely_tensors as lt
+lt.monkey_patch()
+
 
 def log_0(msg):
     log_dist(msg, ranks=[0])
