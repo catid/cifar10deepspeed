@@ -162,6 +162,10 @@ def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc
     data["git_hash"] = git_hash
     data["timestamp"] = datetime_string
     data["seed"] = args.seed
+    data["optimizer"] = "AdamW"
+    data["lr"] = args.lr
+    data["weight_decay"] = args.weight_decay
+    data["max_epoch"] = args.max_epoch
 
     record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value]
     text = "Experiment:\n" + "\n".join(record_lines) + "\n\n"
@@ -211,10 +215,19 @@ def main(args):
 
     log_0(f"Selected model with arch={args.arch}, params={params_to_string(params)}")
 
+    all_parameters = list(model.parameters())
+    # General parameters don't contain the special _optim key
+    optimizer_params = [p for p in all_parameters if not hasattr(p, "_optim")]
+
+    optimizer = torch.optim.AdamW(optimizer_params, lr=args.lr, weight_decay=args.weight_decay)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
+
     # DeepSpeed engine
     model_engine, optimizer, _, _ = deepspeed.initialize(
         args=args,
         model=model,
+        optimizer=optimizer,
+        lr_scheduler=lr_scheduler,
         #config_params=args.deepspeed_config,  <- This should be in the args
         model_parameters=model.parameters())
 
@@ -436,7 +449,6 @@ if __name__ == "__main__":
     parser.add_argument("--params", type=str, default="", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
-    parser.add_argument("--max-epochs", type=int, default=400, help="Maximum epochs to train")
     parser.add_argument("--patience", type=int, default=50, help="Patience for validation loss not decreasing before early stopping")
     parser.add_argument("--output-dir", type=str, default="output_model", help="Path to the output trained model")
     parser.add_argument("--log-dir", type=str, default="tb_logs", help="Path to the Tensorboard logs")
@@ -445,6 +457,9 @@ if __name__ == "__main__":
     parser.add_argument("--result-file", type=str, default="results.txt", help="Append the experiment results to a file")
     parser.add_argument("--notes", type=str, default="", help="Provide any additional notes about the experiment to record")
     parser.add_argument("--seed", type=int, default=-1, help="Seed for random numbers.  Set to -1 to pick a random seed")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
+    parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
+    parser.add_argument("--max-epochs", type=int, default=400, help="Maximum epochs to train")
 
     parser = deepspeed.add_config_arguments(parser)
 

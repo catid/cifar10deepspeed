@@ -21,22 +21,6 @@
       "output_path": "logs",
       "job_name": "cifar10.deepspeed"
     },
-    "optimizer": {
-      "type": "AdamW",
-      "params": {
-        "lr": 1e-4,
-        "betas": [0.8, 0.999],
-        "eps": 1e-8,
-        "weight_decay": 3e-7
-      }
-    },
-    "scheduler": {
-      "type": "OneCycle",
-      "params": {
-        "cycle_min_lr": 1e-4,
-        "cycle_max_lr": 4e-3
-      }
-    },
     "fp16": {
       "enabled": true,
       "loss_scale": 0,

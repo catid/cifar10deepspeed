@@ -57,6 +57,9 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "depth", 4)
         define_param(params_dict, "heads", 6)
         define_param(params_dict, "mlp_dim", 256)
+    if arch == "s4":
+        define_param(params_dict, "d_model", 256)
+        define_param(params_dict, "n_layers", 4)
     if arch == "vit_bojan_flat":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -122,6 +125,17 @@ def select_model(args):
             mlp_dim = params_dict["mlp_dim"],
             dropout = 0.1,
             emb_dropout = 0.1
+        )
+
+    if args.arch == "s4":
+        from models.s4model import S4Model
+        return params_dict, S4Model(
+            d_input=3,
+            d_output=10,
+            d_model=params_dict["d_model"],
+            n_layers=params_dict["n_layers"],
+            dropout=0.2,
+            prenorm=False
         )
 
     if args.arch == "vit_bojan_flat":

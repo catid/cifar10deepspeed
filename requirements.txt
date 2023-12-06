@@ -7,6 +7,12 @@ tensorboard
 Pillow
 einops
 
+# https://github.com/state-spaces/mamba
+mamba-ssm
+
+# S4
+opt_einsum
+
 # Evaluation
 tqdm
 colorama
