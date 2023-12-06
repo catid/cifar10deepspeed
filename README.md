@@ -124,10 +124,11 @@ conda activate train
 python evaluate.py
 
 (train) ➜  cifar10deepspeed git:(main) ✗ python evaluate.py
-2023-12-03 09:23:30,619 [INFO] Loading as FP16: True
-Evaluating: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 6074.96it/s]
-2023-12-03 09:23:32,723 [INFO] Test loss = 0.51888203125
-2023-12-03 09:23:32,723 [INFO] Test accuracy: 84.62%
+2023-12-06 05:15:31,009 [INFO] Loading as FP16: True
+2023-12-06 05:15:31,329 [INFO] Loaded model with parameters: patch_size=4,dim=512,depth=4,heads=6,mlp_dim=256
+Evaluating: 100%|████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 9379.89it/s]
+2023-12-06 05:15:32,405 [INFO] Test loss = 0.51927265625
+2023-12-06 05:15:32,405 [INFO] Test accuracy: 85.1%
 ```
 
 This will print the accuracy % on the test set.  As a sanity check it also reports the test loss of the model, which should match the epoch where it was sampled from during training.
@@ -154,12 +155,8 @@ The dataset must be at the same path on each computer participating in the train
 
 ## Ideas to try:
 
-* Standard transformer with FFN mlp_size=256
-* Pairs of FFN layers instead of one per transformer
-* FFF with depth=7 (256 parameters)
-* Fan-out=4 using softmax instead of 2 with depth=3 (256 parameters)
+* Hardware accelerated S4
+* MAMBA
 * Adjust training rate of root to be smaller than leafs
-* Full dense multiply and select output on CPU for training speed
-* Mix or chain CSC-I
-* Add 8 dense rows
+* CSC-I
 * Ideal Soliton distribution

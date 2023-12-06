@@ -165,7 +165,7 @@ def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc
     data["optimizer"] = "AdamW"
     data["lr"] = args.lr
     data["weight_decay"] = args.weight_decay
-    data["max_epoch"] = args.max_epoch
+    data["max_epochs"] = args.max_epochs
 
     record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value]
     text = "Experiment:\n" + "\n".join(record_lines) + "\n\n"
