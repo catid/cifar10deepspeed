@@ -459,7 +459,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=-1, help="Seed for random numbers.  Set to -1 to pick a random seed")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
     parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
-    parser.add_argument("--max-epochs", type=int, default=400, help="Maximum epochs to train")
+    parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
 
     parser = deepspeed.add_config_arguments(parser)
 

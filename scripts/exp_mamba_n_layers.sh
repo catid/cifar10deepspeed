@@ -19,6 +19,9 @@ launch_training() {
 params="d_model=256,d_state=16,d_conv=4,expand=2,n_layers=8" # no spaces allowed
 launch_training
 
+params="d_model=128,d_state=16,d_conv=4,expand=2,n_layers=8" # no spaces allowed
+launch_training
+
 params="d_model=256,d_state=16,d_conv=4,expand=2,n_layers=7" # no spaces allowed
 launch_training
 
