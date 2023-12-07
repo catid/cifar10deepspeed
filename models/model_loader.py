@@ -60,6 +60,12 @@ def apply_default_model_params(arch, params_dict):
     if arch == "s4":
         define_param(params_dict, "d_model", 256)
         define_param(params_dict, "n_layers", 4)
+    if arch == "mamba":
+        define_param(params_dict, "d_model", 256)
+        define_param(params_dict, "d_state", 16)
+        define_param(params_dict, "d_conv", 4)
+        define_param(params_dict, "expand", 2)
+        define_param(params_dict, "n_layers", 4)
     if arch == "vit_bojan_flat":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -133,6 +139,20 @@ def select_model(args):
             d_input=3,
             d_output=10,
             d_model=params_dict["d_model"],
+            n_layers=params_dict["n_layers"],
+            dropout=0.2,
+            prenorm=False
+        )
+
+    if args.arch == "mamba":
+        from models.mamba_model import MambaModel
+        return params_dict, MambaModel(
+            d_input=3,
+            d_output=10,
+            d_model=params_dict["d_model"],
+            d_state=params_dict["d_state"],
+            d_conv=params_dict["d_conv"],
+            expand=params_dict["expand"],
             n_layers=params_dict["n_layers"],
             dropout=0.2,
             prenorm=False
