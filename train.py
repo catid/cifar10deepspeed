@@ -391,7 +391,7 @@ def main(args):
             log_0(f"Epoch {epoch + 1} - TrainLoss={avg_train_loss:.4f}, ValLoss={avg_val_loss:.4f}, ValAcc={val_acc:.2f}%, Time={epoch_time:.2f} sec")
 
         # Check if validation loss has improved
-        if avg_val_loss < best_val_loss:
+        if val_acc > best_val_acc:
             best_val_loss = avg_val_loss
             best_val_acc = val_acc
             best_train_loss = avg_train_loss

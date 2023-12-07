@@ -61,7 +61,8 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "d_model", 256)
         define_param(params_dict, "n_layers", 4)
     if arch == "mamba":
-        define_param(params_dict, "d_model", 256)
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "d_model", 512)
         define_param(params_dict, "d_state", 16)
         define_param(params_dict, "d_conv", 4)
         define_param(params_dict, "expand", 2)
@@ -145,17 +146,17 @@ def select_model(args):
         )
 
     if args.arch == "mamba":
-        from models.mamba_model import MambaModel
-        return params_dict, MambaModel(
-            d_input=3,
-            d_output=10,
+        from models.mamba_model import ViM
+        return params_dict, ViM(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
             d_model=params_dict["d_model"],
             d_state=params_dict["d_state"],
             d_conv=params_dict["d_conv"],
             expand=params_dict["expand"],
             n_layers=params_dict["n_layers"],
-            dropout=0.2,
-            prenorm=False
+            dropout=0.1
         )
 
     if args.arch == "vit_bojan_flat":
