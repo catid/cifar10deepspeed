@@ -62,7 +62,7 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "n_layers", 4)
     if arch == "mamba":
         define_param(params_dict, "patch_size", 4)
-        define_param(params_dict, "d_model", 512)
+        define_param(params_dict, "d_model", 256)
         define_param(params_dict, "d_state", 16)
         define_param(params_dict, "d_conv", 4)
         define_param(params_dict, "expand", 2)

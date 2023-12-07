@@ -312,7 +312,7 @@ def main(args):
 
     best_train_loss = float("inf")
     best_val_loss = float("inf")
-    best_val_acc = float("inf")
+    best_val_acc = float("-inf")
     avg_val_loss = float("inf")
     start_epoch = 0
     end_epoch = 0
