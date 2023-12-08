@@ -17,41 +17,11 @@ def pair(t):
 
 # classes
 
-class DropoutNd(nn.Module):
-    def __init__(self, p: float = 0.5, tie=True, transposed=True):
-        """
-        tie: tie dropout mask across sequence lengths (Dropout1d/2d/3d)
-        """
-        super().__init__()
-        if p < 0 or p >= 1:
-            raise ValueError("dropout probability has to be in [0, 1), " "but got {}".format(p))
-        self.p = p
-        self.tie = tie
-        self.transposed = transposed
-        self.binomial = torch.distributions.binomial.Binomial(probs=1-self.p)
-
-    def forward(self, X):
-        """X: (batch, dim, lengths...)."""
-        if self.training:
-            if not self.transposed: X = rearrange(X, 'b ... d -> b d ...')
-            # binomial = torch.distributions.binomial.Binomial(probs=1-self.p) # This is incredibly slow because of CPU -> GPU copying
-            mask_shape = X.shape[:2] + (1,)*(X.ndim-2) if self.tie else X.shape
-            # mask = self.binomial.sample(mask_shape)
-            mask = torch.rand(*mask_shape, device=X.device) < 1.-self.p
-            X = X * mask * (1.0/(1-self.p))
-            if not self.transposed: X = rearrange(X, 'b d ... -> b ... d')
-            return X
-        return X
-
 class Block(nn.Module):
-    def __init__(self, index, d_model, d_state, d_conv, expand, dropout):
+    def __init__(self, index, d_model, d_state, d_conv, expand):
         super().__init__()
         self.norm = nn.LayerNorm(d_model)
         self.mamba = Mamba(d_model=d_model, d_state=d_state, d_conv=d_conv, expand=expand, layer_idx=index)
-
-        # FIXME: Implement dropout
-        #dropout_fn = DropoutNd
-        #self.dropout = dropout_fn(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x, **kwargs):
         # Block norm
@@ -83,7 +53,7 @@ class SPT(nn.Module):
         return self.to_patch_tokens(x_with_shifts)
 
 class ViM(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, d_model, d_state, d_conv, expand, n_layers, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
+    def __init__(self, *, image_size, patch_size, num_classes, d_model, d_state, d_conv, expand, n_layers, pool = 'cls', channels = 3, emb_dropout = 0.):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
@@ -102,7 +72,7 @@ class ViM(nn.Module):
 
         self.blocks = nn.ModuleList([])
         for i in range(n_layers):
-            self.blocks.append(Block(i, d_model, d_state, d_conv, expand, dropout))
+            self.blocks.append(Block(i, d_model, d_state, d_conv, expand))
 
         self.pool = pool
         self.to_latent = nn.Identity()

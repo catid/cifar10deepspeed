@@ -156,7 +156,6 @@ def select_model(args):
             d_conv=params_dict["d_conv"],
             expand=params_dict["expand"],
             n_layers=params_dict["n_layers"],
-            dropout=0.1
         )
 
     if args.arch == "vit_bojan_flat":
