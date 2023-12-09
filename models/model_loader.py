@@ -57,6 +57,14 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "depth", 4)
         define_param(params_dict, "heads", 6)
         define_param(params_dict, "mlp_dim", 256)
+    if arch == "vit_tiny_sparse":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "dim", 512)
+        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "heads", 6)
+        define_param(params_dict, "mlp_dim", 256)
+        define_param(params_dict, "in_splits", 8)
+        define_param(params_dict, "out_splits", 16)
     if arch == "s4":
         define_param(params_dict, "d_model", 256)
         define_param(params_dict, "n_layers", 4)
@@ -130,6 +138,22 @@ def select_model(args):
             depth = params_dict["depth"],
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
+
+    if args.arch == "vit_tiny_sparse":
+        from models.vit_small_sparse import ViTSparse
+        return params_dict, ViTSparse(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
+            dim = params_dict["dim"],
+            depth = params_dict["depth"],
+            heads = params_dict["heads"],
+            mlp_dim = params_dict["mlp_dim"],
+            in_splits = params_dict["in_splits"],
+            out_splits = params_dict["out_splits"],
             dropout = 0.1,
             emb_dropout = 0.1
         )

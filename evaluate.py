@@ -35,9 +35,21 @@ from models.model_loader import select_model, params_to_string
 import torch
 import torch.nn as nn
 
-def load_model(args, model_path, fp16):
+def load_model(args):
+    model_path = args.model
+    fp16 = not args.fp32
+
+    data = torch.load(model_path)
+    if 'cifar10deepspeed' in data:
+        key = data['cifar10deepspeed']
+        args.arch = key["arch"]
+        args.fp16 = key["fp16"]
+        args.params = params_to_string(key["model_params"])
+        del data['cifar10deepspeed']
+
     params, model = select_model(args)
-    model.load_state_dict(torch.load(model_path))
+
+    model.load_state_dict(data)
     if fp16:
         model.half()
     model.eval()
@@ -137,20 +149,20 @@ def evaluate(model, dataset_dir, fp16=True):
 import argparse
 
 def main(args):
-    fp16 = not args.fp32
-    logger.info(f"Loading as FP16: {fp16}")
+    # This mutates the args to update e.g. args.fp16 from the .pth file
+    params, model = load_model(args)
 
-    params, model = load_model(args, args.model, fp16)
+    num_params = sum(p.numel() for p in model.parameters())
 
-    logger.info(f"Loaded model with parameters: {params_to_string(params)}")
+    logger.info(f"Loaded model with configuration: {params_to_string(params)}, model size = {num_params} weights")
 
-    evaluate(model, args.dataset_dir, fp16=fp16)
+    evaluate(model, args.dataset_dir, fp16=args.fp16)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--model", type=str, default="cifar10.pth", help="Path to the model file produced by export_trained_model.py")
     parser.add_argument("--params", type=str, default="", help="Parameters to pass to the model loader")
-    parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture (must match model file)")
+    parser.add_argument("--arch", type=str, default="", help="Model architecture (must match model file)")
     parser.add_argument('--fp32', action='store_true', help='Use FP32 network instead of FP16 (only if you trained in fp32 instead)')
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
 

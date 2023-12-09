@@ -119,6 +119,8 @@ It's also interesting that by dropping mlp_dim to just 16 from 256, it only lose
 
 ## Stand-alone evaluation
 
+The training script inserts a `cifar10deepspeed` key into the PyTorch `.pth` model file dictionary containing the architecture, architecture parameters, and fp16 mode so that it can reload the correct model from the file.  So you should not need to specify the model during evaluation.
+
 ```bash
 conda activate train
 python evaluate.py

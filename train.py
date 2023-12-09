@@ -416,6 +416,11 @@ def main(args):
                 # Write output .pth file
                 saved_state_dict = model_engine.state_dict()
                 fixed_state_dict = {key.replace("module.", ""): value for key, value in saved_state_dict.items()}
+                fixed_state_dict['cifar10deepspeed'] = {
+                    'arch': args.arch,
+                    'fp16': fp16,
+                    'model_params': params,
+                }
                 torch.save(fixed_state_dict, args.output_model)
                 log_0(f"Wrote model to {args.output_model} with val_loss={best_val_loss:.4f}, val_acc={best_val_acc:.2f}%")
         else:
