@@ -13,6 +13,9 @@ mamba-ssm
 # S4
 opt_einsum
 
+# x-transformers
+x-transformers
+
 # Evaluation
 tqdm
 colorama

@@ -51,6 +51,11 @@ def get_model_params(arch_str, params_str):
 # Define new models here:
 
 def apply_default_model_params(arch, params_dict):
+    if arch == "x_transformers":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "dim", 512)
+        define_param(params_dict, "depth", 6)
+        define_param(params_dict, "heads", 8)
     if arch == "vit_tiny":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -127,6 +132,26 @@ def apply_default_model_params(arch, params_dict):
 
 def select_model(args):
     params_dict = get_model_params(args.arch, args.params)
+
+    if args.arch == "x_transformers":
+        from x_transformers import ViTransformerWrapper, Encoder
+
+        return params_dict, ViTransformerWrapper(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
+            attn_layers = Encoder(
+                dim = params_dict["dim"],
+                depth = params_dict["depth"],
+                heads = params_dict["heads"],
+                #pre_norm = False,
+                #residual_attn = True,
+                macaron = True,
+                #attn_sparse_topk = 8,
+                #ff_relu_squared = True,
+                #use_simple_rmsnorm = True,
+            )
+        )
 
     if args.arch == "vit_tiny":
         from models.vit_small import ViT
