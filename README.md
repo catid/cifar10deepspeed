@@ -126,11 +126,10 @@ conda activate train
 python evaluate.py
 
 (train) ➜  cifar10deepspeed git:(main) ✗ python evaluate.py
-2023-12-06 05:15:31,009 [INFO] Loading as FP16: True
-2023-12-06 05:15:31,329 [INFO] Loaded model with parameters: patch_size=4,dim=512,depth=4,heads=6,mlp_dim=256
-Evaluating: 100%|████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 9379.89it/s]
-2023-12-06 05:15:32,405 [INFO] Test loss = 0.51927265625
-2023-12-06 05:15:32,405 [INFO] Test accuracy: 85.1%
+2023-12-10 06:33:54,631 [INFO] Loaded model with arch=x_transformers config=patch_size=4,dim=512,depth=6,heads=8 fp16=True model size = 31571562 weights
+Evaluating: 100%|████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 7490.96it/s]
+2023-12-10 06:33:56,008 [INFO] Test loss = 0.509036669921875
+2023-12-10 06:33:56,008 [INFO] Test accuracy: 88.6%
 ```
 
 This will print the accuracy % on the test set.  As a sanity check it also reports the test loss of the model, which should match the epoch where it was sampled from during training.

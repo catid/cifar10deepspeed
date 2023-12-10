@@ -157,7 +157,7 @@ def main(args):
     #for name, param in model.named_parameters():
     #    print(f"{name}: shape={param.shape} numel={param.numel()}")
 
-    logger.info(f"Loaded model with configuration: {params_to_string(params)}, model size = {num_params} weights")
+    logger.info(f"Loaded model with arch={args.arch} config={params_to_string(params)} fp16={args.fp16} model size = {num_params} weights")
 
     evaluate(model, args.dataset_dir, fp16=args.fp16)
 
