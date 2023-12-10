@@ -53,9 +53,9 @@ def get_model_params(arch_str, params_str):
 def apply_default_model_params(arch, params_dict):
     if arch == "x_transformers":
         define_param(params_dict, "patch_size", 4)
-        define_param(params_dict, "dim", 512)
-        define_param(params_dict, "depth", 6)
-        define_param(params_dict, "heads", 8)
+        define_param(params_dict, "dim", 256)
+        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "heads", 6)
     if arch == "vit_tiny":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -145,10 +145,11 @@ def select_model(args):
                 depth = params_dict["depth"],
                 heads = params_dict["heads"],
                 #pre_norm = False,
-                #residual_attn = True,
+                residual_attn = True,
                 macaron = True,
                 #attn_sparse_topk = 8,
                 #ff_relu_squared = True,
+                use_rmsnorm = True,
                 #use_simple_rmsnorm = True,
             )
         )
