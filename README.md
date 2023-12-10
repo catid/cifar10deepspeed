@@ -6,6 +6,8 @@ I would like to use this as a scalable training script for exploring modificatio
 
 As compared to the `vision-transformers-cifar10` repo: This repo uses about half as many epochs, each running about 2x faster, so about 4x faster overall, to train the same model with 3% higher accuracy scores.
 
+By bringing in the latest `x-transformers` model, we can use the same number of parameters as ViT-tiny to achieve 3% higher performance again: 89%.  By using 4x more parameters we can get over 90% without pre-training.
+
 Experimental runs (git hash, results, all parameters) are recorded to a results text file so that you can run a batch of experiments and then use the results text file to reproduce the results and generate graphs.
 
 
@@ -136,6 +138,15 @@ This will print the accuracy % on the test set.  As a sanity check it also repor
 
 You can actually run the evaluation script while the training script is running if you are impatient.
 
+Here's another run with a 6x smaller model that performs better:
+
+```bash
+(train) ➜  cifar10deepspeed git:(main) ✗ python evaluate.py
+2023-12-10 19:34:59,060 [INFO] Loaded model with arch=x_transformers config=patch_size=4,dim=256,depth=4,heads=6 fp16=True model size = 5812842 weights
+Evaluating: 100%|████████████████████████████████████████████████████████████████████████████████████████████████| 10000/10000 [00:01<00:00, 9448.25it/s]
+2023-12-10 19:35:00,150 [INFO] Test loss = 0.46669970703125
+2023-12-10 19:35:00,150 [INFO] Test accuracy: 88.95%
+```
 
 ## Set up training cluster
 
