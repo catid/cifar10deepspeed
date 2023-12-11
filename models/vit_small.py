@@ -1,6 +1,5 @@
 # https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_for_small_dataset.py
 
-from math import sqrt
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -54,11 +53,24 @@ class LSA(nn.Module):
             nn.Dropout(dropout)
         )
 
+        self.scale = dim_head ** -0.5
+        self.scale_inverse = dim_head ** 0.5
+        self.option = 'baseline'
+
     def forward(self, x):
         qkv = self.to_qkv(x).chunk(3, dim = -1)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
 
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.temperature.exp()
+        dots = torch.matmul(q, k.transpose(-1, -2))
+
+        if self.option == 'baseline':
+            dots = dots * self.temperature.exp()
+        elif self.option == 'sqrtd':
+            dots = dots / torch.clamp(dots.std(dim=-1, keepdim=True), max=self.scale_inverse, min=1e-6)
+        elif self.option == 'inf':
+            dots = dots / torch.clamp(dots.std(dim=-1, keepdim=True), min=1e-6)
+        else:
+            exit(1)
 
         mask = torch.eye(dots.shape[-1], device = dots.device, dtype = torch.bool)
         mask_value = -torch.finfo(dots.dtype).max
