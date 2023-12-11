@@ -163,12 +163,3 @@ The dataset must be at the same path on each computer participating in the train
 ```bash
 ./launch_distributed_train.sh
 ```
-
-
-## Ideas to try:
-
-* Hardware accelerated S4
-* MAMBA
-* Adjust training rate of root to be smaller than leafs
-* CSC-I
-* Ideal Soliton distribution
