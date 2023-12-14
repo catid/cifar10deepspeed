@@ -80,6 +80,14 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "d_conv", 4)
         define_param(params_dict, "expand", 2)
         define_param(params_dict, "n_layers", 4)
+    if arch == "based":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "d_model", 256)
+        define_param(params_dict, "kernel_size", 3)
+        define_param(params_dict, "feature_dim", 8)
+        define_param(params_dict, "num_key_value_heads", 1)
+        define_param(params_dict, "num_heads", 1)
+        define_param(params_dict, "n_layers", 4)
     if arch == "vit_bojan_flat":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -205,6 +213,20 @@ def select_model(args):
             d_state=params_dict["d_state"],
             d_conv=params_dict["d_conv"],
             expand=params_dict["expand"],
+            n_layers=params_dict["n_layers"],
+        )
+
+    if args.arch == "based":
+        from models.based_model import ViBased
+        return params_dict, ViBased(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
+            d_model=params_dict["d_model"],
+            kernel_size=params_dict["kernel_size"],
+            feature_dim=params_dict["feature_dim"],
+            num_key_value_heads=params_dict["num_key_value_heads"],
+            num_heads=params_dict["num_heads"],
             n_layers=params_dict["n_layers"],
         )
 
