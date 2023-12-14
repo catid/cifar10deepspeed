@@ -394,12 +394,27 @@ def pair(t):
 
 # classes
 
+class FeedForward(nn.Module):
+    def __init__(self, dim, hidden_dim, dropout = 0.):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        y = self.net(x)
+        return y
+
 class Block(nn.Module):
-    def __init__(self, index, l_max, d_model, kernel_size, feature_dim, num_key_value_heads, num_heads):
+    def __init__(self, index, l_max, d_model, hidden_dim, kernel_size, feature_dim, num_key_value_heads, num_heads):
         super().__init__()
         self.norm = nn.LayerNorm(d_model)
         self.base_conv = BaseConv(d_model=d_model, l_max=l_max, kernel_size=kernel_size, layer_idx=index, implicit_long_conv=True)
         self.based = Based(d_model=d_model, l_max=l_max, feature_dim=feature_dim, num_key_value_heads=num_key_value_heads, num_heads=num_heads, feature_name="taylor_exp", causal=True)
+        self.ffn = FeedForward(d_model, hidden_dim=hidden_dim)
 
     def forward(self, x, **kwargs):
         # Block norm
@@ -407,6 +422,8 @@ class Block(nn.Module):
 
         y = self.base_conv(y)
         y = self.based(y)
+
+        y = self.ffn(y)
 
         # Residual connection
         y += x
@@ -431,7 +448,7 @@ class SPT(nn.Module):
         return self.to_patch_tokens(x_with_shifts)
 
 class ViBased(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, d_model, kernel_size, feature_dim, num_key_value_heads, num_heads, n_layers, pool = 'cls', channels = 3, emb_dropout = 0.):
+    def __init__(self, *, image_size, patch_size, num_classes, d_model, hidden_dim, kernel_size, feature_dim, num_key_value_heads, num_heads, n_layers, pool = 'cls', channels = 3, emb_dropout = 0.):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
@@ -452,7 +469,7 @@ class ViBased(nn.Module):
 
         self.blocks = nn.ModuleList([])
         for i in range(n_layers):
-            self.blocks.append(Block(i, l_max, d_model, kernel_size=kernel_size, feature_dim=feature_dim, num_key_value_heads=num_key_value_heads, num_heads=num_heads))
+            self.blocks.append(Block(i, l_max, d_model, hidden_dim=hidden_dim, kernel_size=kernel_size, feature_dim=feature_dim, num_key_value_heads=num_key_value_heads, num_heads=num_heads))
 
         self.pool = pool
         self.to_latent = nn.Identity()
