@@ -83,7 +83,7 @@ def apply_default_model_params(arch, params_dict):
     if arch == "based":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "d_model", 256)
-        define_param(params_dict, "hidden_dim", 256)
+        define_param(params_dict, "hidden_dim", 1024)
         define_param(params_dict, "kernel_size", 3)
         define_param(params_dict, "feature_dim", 8)
         define_param(params_dict, "num_key_value_heads", 6)

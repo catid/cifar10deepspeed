@@ -413,7 +413,7 @@ class Block(nn.Module):
         super().__init__()
         self.norm = nn.LayerNorm(d_model)
         self.base_conv = BaseConv(d_model=d_model, l_max=l_max, kernel_size=kernel_size, layer_idx=index, implicit_long_conv=True)
-        self.based = Based(d_model=d_model, l_max=l_max, feature_dim=feature_dim, num_key_value_heads=num_key_value_heads, num_heads=num_heads, feature_name="taylor_exp", causal=True)
+        self.based = Based(d_model=d_model, l_max=l_max, feature_dim=feature_dim, num_key_value_heads=num_key_value_heads, num_heads=num_heads, feature_name="taylor_exp", causal=False)
         self.ffn = FeedForward(d_model, hidden_dim=hidden_dim)
 
     def forward(self, x, **kwargs):
