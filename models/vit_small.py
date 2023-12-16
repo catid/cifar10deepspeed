@@ -51,6 +51,42 @@ class SpectralNormedWeight(nn.Module):
 
         return self.weight / sigma
 
+class FP32SpectralNormedWeight(nn.Module):
+    """SpectralNorm FP32 wrapper."""
+
+    __constants__ = ["enabled"]  # for jit-scripting
+
+    def __init__(self, module: nn.Module, enabled: bool = True):
+        super().__init__()
+        self.net = module
+        self.enabled = enabled
+
+    def __repr__(self):
+        """Extra str info."""
+        return (
+            f"FP32SpectralNormedWeight({self.net.__repr__()}, enabled={self.enabled})"
+        )
+
+    def forward(self):
+        with torch.cuda.amp.autocast(enabled=self.enabled):
+            u = self.net.u
+            weight = self.net.weight
+
+            if not self.enabled:
+                u = u.float()
+                weight = weight.float()
+
+            sigma = self.net.get_sigma(u=u, weight=weight)
+            if self.training:
+                self.net.spectral_norm.data.copy_(sigma)
+
+            return weight / sigma
+
+    @property
+    def spectral_norm(self) -> torch.Tensor:
+        return self.net.spectral_norm
+
+
 class SNLinear(nn.Linear):
     """Spectral Norm linear from sigmaReparam.
 
@@ -67,6 +103,7 @@ class SNLinear(nn.Linear):
         bias: bool = True,
         init_multiplier: float = 1.0,
         stats_only: bool = False,
+        fp32: bool = False,
     ):
         super().__init__(in_features, out_features, bias=bias)
         self.stats_only = stats_only
@@ -76,7 +113,10 @@ class SNLinear(nn.Linear):
         nn.init.trunc_normal_(self.weight, std=self.init_std)
 
         # Handle normalization and add a learnable scalar.
-        self.spectral_normed_weight = SpectralNormedWeight(self.weight)
+        if fp32:
+            self.spectral_normed_weight = FP32SpectralNormedWeight(SpectralNormedWeight(self.weight), enabled=False)
+        else:
+            self.spectral_normed_weight = SpectralNormedWeight(self.weight)
         sn_init = self.spectral_normed_weight.spectral_norm
 
         # Would have set sigma to None if `stats_only` but jit really disliked this
@@ -192,8 +232,7 @@ class SPT(nn.Module):
 
         self.to_patch_tokens = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
-            nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, dim)
+            SNLinear(patch_dim, dim, fp32=True)
         )
 
     def forward(self, x):
