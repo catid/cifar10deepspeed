@@ -170,6 +170,47 @@ class LSA(nn.Module):
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
 
+import torch
+import torch.nn as nn
+from einops import rearrange
+
+class LSA_FFN(nn.Module):
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
+        super().__init__()
+        self.dim = dim
+        self.heads = heads
+        inner_dim = dim_head * heads
+        self.temperature = nn.Parameter(torch.log(torch.tensor(dim_head ** -0.5)))
+
+        self.attend = nn.Softmax(dim=-1)
+        # Adjust to_qkv to produce Q, K, V for each feature dimension
+        self.to_qkv = SNLinear(dim, inner_dim * 3, bias=False)
+
+        # Adjust output projection
+        self.to_out = nn.Sequential(
+            SNLinear(inner_dim, dim),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, x):
+        # Reshape input to apply attention within each token
+        qkv = self.to_qkv(x).chunk(3, dim = -1)
+
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b n h d', h = self.heads), qkv)
+
+        # Compute attention scores within each token
+        dots = torch.matmul(q, k.transpose(-2, -1)) * self.temperature.exp()
+
+        # Mask and softmax to get attention weights
+        attn = self.attend(dots)
+
+        # Apply attention to value vectors
+        out = torch.matmul(attn, v)
+        out = rearrange(out, 'b n h d -> b n (h d)')
+
+        # Apply output projection
+        return self.to_out(out)
+
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         super().__init__()
@@ -177,7 +218,7 @@ class Transformer(nn.Module):
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
                 LSA(dim, heads = heads, dim_head = dim_head, dropout = dropout),
-                FeedForward(dim, mlp_dim, dropout = dropout)
+                LSA_FFN(dim, dropout = dropout)
             ]))
     def forward(self, x):
         for attn, ff in self.layers:
