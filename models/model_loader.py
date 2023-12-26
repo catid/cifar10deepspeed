@@ -62,6 +62,13 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "depth", 4)
         define_param(params_dict, "heads", 6)
         define_param(params_dict, "mlp_dim", 256)
+    if arch == "soft_moe":
+        define_param(params_dict, "patch_size", 4)
+        define_param(params_dict, "dim", 512)
+        define_param(params_dict, "depth", 4)
+        define_param(params_dict, "heads", 6)
+        define_param(params_dict, "num_experts", 4)
+        define_param(params_dict, "expert_mult", 1)
     if arch == "vit_tiny_sparse":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
@@ -173,6 +180,21 @@ def select_model(args):
             depth = params_dict["depth"],
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
+            dropout = 0.1,
+            emb_dropout = 0.1
+        )
+
+    if args.arch == "soft_moe":
+        from models.soft_moe import SoftMoEViT
+        return params_dict, SoftMoEViT(
+            image_size = 32,
+            patch_size = params_dict["patch_size"],
+            num_classes = 10,
+            dim = params_dict["dim"],
+            depth = params_dict["depth"],
+            heads = params_dict["heads"],
+            num_experts = params_dict["num_experts"],
+            expert_mult = params_dict["expert_mult"],
             dropout = 0.1,
             emb_dropout = 0.1
         )

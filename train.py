@@ -306,7 +306,8 @@ def main(args):
 
     # The time this takes to compile sadly offsets the time it saves
     # Without dynamic=True it actually takes *longer* overall
-    forward_and_loss = torch.compile(forward_and_loss, dynamic=True, fullgraph=False)
+    if not args.nocompile:
+        forward_and_loss = torch.compile(forward_and_loss, dynamic=True, fullgraph=False)
 
     # Initialize training
 
@@ -465,6 +466,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
     parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
+    parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
 
     parser = deepspeed.add_config_arguments(parser)
 
