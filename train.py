@@ -24,8 +24,8 @@ from torch.utils.tensorboard import SummaryWriter
 from models.model_loader import select_model, params_to_string
 
 # Prettify printing tensors when debugging
-import lovely_tensors as lt
-lt.monkey_patch()
+#import lovely_tensors as lt
+#lt.monkey_patch()
 
 
 def log_0(msg):
@@ -58,7 +58,10 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
     model_engine.train()
 
     with torch.set_grad_enabled(True):
-        for batch_idx, (labels, images) in enumerate(train_loader):
+        for batch_idx, data in enumerate(train_loader):
+            assert len(data) == 1, "FIXME"
+            labels, images, files = data[0]["labels"], data[0]["images"], data[0]["file_path"]
+
             images = (images / 255.0).to(image_dtype) # Normalize NCHW uint8 input
             labels = labels.squeeze().to(torch.long)
 
@@ -83,7 +86,10 @@ def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engi
     model_engine.eval()
 
     with torch.set_grad_enabled(False):
-        for batch_idx, (labels, images) in enumerate(val_loader):
+        for batch_idx, data in enumerate(val_loader):
+            assert len(data) == 1, "FIXME"
+            labels, images, files = data[0]["labels"], data[0]["images"], data[0]["file_path"]
+
             images = (images / 255.0).to(image_dtype) # Normalize NCHW uint8 input
             labels = labels.squeeze().to(torch.long)
 
@@ -273,18 +279,6 @@ def main(args):
     dataset_dir = get_absolute_path(args.dataset_dir)
     log_all(f"Loading dataset from: {dataset_dir}")
 
-    train_loader = CifarDataLoader(
-        batch_size=data_loader_batch_size,
-        device_id=rank,
-        num_threads=num_loader_threads,
-        seed=seed,
-        file_list=os.path.join(dataset_dir, "training_file_list.txt"),
-        mode='training',
-        crop_w=crop_w,
-        crop_h=crop_h,
-        shard_id=shard_id,
-        num_shards=num_gpus)
-
     val_loader = CifarDataLoader(
         batch_size=data_loader_batch_size,
         device_id=rank,
@@ -344,6 +338,18 @@ def main(args):
     for epoch in range(start_epoch, args.max_epochs):
         end_epoch = epoch
         start_time = time.time()
+
+        train_loader = CifarDataLoader(
+            batch_size=data_loader_batch_size,
+            device_id=rank,
+            num_threads=num_loader_threads,
+            seed=seed,
+            file_list=os.path.join(dataset_dir, "training_file_list.txt"),
+            mode='training',
+            crop_w=crop_w,
+            crop_h=crop_h,
+            shard_id=shard_id,
+            num_shards=num_gpus)
 
         train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, image_dtype)
 
