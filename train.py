@@ -252,27 +252,24 @@ def get_opt_class(opt_name):
 
 
 from torch.optim.lr_scheduler import (SequentialLR, LinearLR, StepLR, MultiStepLR,
-                                      ExponentialLR, ReduceLROnPlateau, CyclicLR,
-                                      OneCycleLR, CosineAnnealingLR, CosineAnnealingWarmRestarts)
+                                      ExponentialLR, OneCycleLR, CosineAnnealingLR,
+                                      CosineAnnealingWarmRestarts)
 
 def build_lr_scheduler(optimizer, scheduler_type, warmup_epochs, total_epochs, **kwargs):
     warmup_lr_scheduler = LinearLR(optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs)
 
     if scheduler_type == "StepLR":
-        scheduler = StepLR(optimizer, step_size=kwargs.get('step_size', 30), gamma=kwargs.get('gamma', 0.1))
+        scheduler = StepLR(optimizer, step_size=kwargs.get('step_size', 50), gamma=kwargs.get('gamma', 0.5))
     elif scheduler_type == "MultiStepLR":
         scheduler = MultiStepLR(optimizer, milestones=kwargs.get('milestones', [30, 60]), gamma=kwargs.get('gamma', 0.1))
     elif scheduler_type == "ExponentialLR":
-        scheduler = ExponentialLR(optimizer, gamma=kwargs.get('gamma', 0.95))
-    elif scheduler_type == "CyclicLR":
-        scheduler = CyclicLR(optimizer, base_lr=kwargs.get('base_lr', 0.001), max_lr=kwargs.get('max_lr', 0.01),
-                             step_size_up=kwargs.get('step_size_up', 2000))
+        scheduler = ExponentialLR(optimizer, gamma=kwargs.get('gamma', 0.9))
     elif scheduler_type == "OneCycleLR":
-        scheduler = OneCycleLR(optimizer, max_lr=kwargs.get('max_lr', 0.01), total_steps=total_epochs)
+        scheduler = OneCycleLR(optimizer, max_lr=kwargs.get('max_lr', 0.01), total_steps=total_epochs - warmup_epochs)
     elif scheduler_type == "CosineAnnealingLR":
         scheduler = CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
     elif scheduler_type == "CosineAnnealingWarmRestarts":
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=kwargs.get('T_0', total_epochs), T_mult=kwargs.get('T_mult', 1))
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=kwargs.get('T_0', total_epochs - warmup_epochs), T_mult=kwargs.get('T_mult', 1))
     else:
         raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
 
