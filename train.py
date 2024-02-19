@@ -251,9 +251,9 @@ def get_opt_class(opt_name):
     return opt_class
 
 
-from torch.optim.lr_scheduler import (SequentialLR, LinearLR, StepLR, MultiStepLR,
-                                      ExponentialLR, OneCycleLR, CosineAnnealingLR,
-                                      CosineAnnealingWarmRestarts)
+from torch.optim.lr_scheduler import (SequentialLR, LinearLR, CosineAnnealingLR,
+                                      CosineAnnealingWarmRestarts, StepLR, MultiStepLR,
+                                      ExponentialLR, OneCycleLR)
 
 def build_lr_scheduler(optimizer, scheduler_type, warmup_epochs, total_epochs, **kwargs):
     warmup_lr_scheduler = LinearLR(optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs)
@@ -265,7 +265,7 @@ def build_lr_scheduler(optimizer, scheduler_type, warmup_epochs, total_epochs, *
     elif scheduler_type == "ExponentialLR":
         scheduler = ExponentialLR(optimizer, gamma=kwargs.get('gamma', 0.9))
     elif scheduler_type == "OneCycleLR":
-        scheduler = OneCycleLR(optimizer, max_lr=kwargs.get('max_lr', 0.01), total_steps=total_epochs - warmup_epochs)
+        scheduler = OneCycleLR(optimizer, max_lr=kwargs.get('max_lr', 0.01), total_steps=total_epochs+1)
     elif scheduler_type == "CosineAnnealingLR":
         scheduler = CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
     elif scheduler_type == "CosineAnnealingWarmRestarts":
@@ -480,7 +480,8 @@ def main(args):
             log_0(f"Epoch {epoch + 1} - TrainLoss={avg_train_loss:.4f}, ValLoss={avg_val_loss:.4f}, ValAcc={val_acc:.2f}%, Time={epoch_time:.2f} sec")
 
             if args.wandb:
-                wandb.log({"avg_train_loss": avg_train_loss, "val_acc": val_acc, "avg_val_loss": avg_val_loss, "epoch": epoch, "wallclock_time": epoch_time})
+                lr = optimizer.param_groups[0]['lr']
+                wandb.log({"avg_train_loss": avg_train_loss, "val_acc": val_acc, "avg_val_loss": avg_val_loss, "epoch": epoch, "wallclock_time": epoch_time, "lr": lr})
 
         # Check if validation loss has improved
         if val_acc > best_val_acc:
@@ -550,7 +551,6 @@ if __name__ == "__main__":
     parser.add_argument("--params", type=str, default="", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
-    parser.add_argument("--patience", type=int, default=50, help="Patience for validation loss not decreasing before early stopping")
     parser.add_argument("--output-dir", type=str, default="output_model", help="Path to the output trained model")
     parser.add_argument("--log-dir", type=str, default="tb_logs", help="Path to the Tensorboard logs")
     parser.add_argument("--reset", action="store_true", help="Reset training from scratch")
@@ -558,14 +558,17 @@ if __name__ == "__main__":
     parser.add_argument("--result-file", type=str, default="results.txt", help="Append the experiment results to a file")
     parser.add_argument("--notes", type=str, default="", help="Provide any additional notes about the experiment to record")
     parser.add_argument("--seed", type=int, default=-1, help="Seed for random numbers.  Set to -1 to pick a random seed")
+    parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
+    parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
+
+    # Hyperparameters
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
     parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
     parser.add_argument("--warmup-epochs", type=int, default=5, help="Number of epochs to apply warmup LR schedule")
-    parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
     parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
-    parser.add_argument("--scheduler", type=str, default="CosineAnnealingLR", help="LR scheduler to use for training")
-    parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
+    parser.add_argument("--scheduler", type=str, default="CosineAnnealingWarmRestarts", help="LR scheduler to use for training")
+    parser.add_argument("--patience", type=int, default=50, help="Patience for validation loss not decreasing before early stopping")
 
     parser = deepspeed.add_config_arguments(parser)
 
