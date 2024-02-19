@@ -23,10 +23,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.model_loader import select_model, params_to_string
 
-import torch_optimizer as optimizers # https://github.com/jettify/pytorch-optimizer/
-
-from optim.lilith import Lilith
-
 import wandb
 
 # Prettify printing tensors when debugging
@@ -172,6 +168,7 @@ def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc
     data["weight_decay"] = args.weight_decay
     data["max_epochs"] = args.max_epochs
     data["optimizer"] = args.optimizer
+    data["scheduler"] = args.scheduler
 
     record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value]
     text = "Experiment:\n" + "\n".join(record_lines) + "\n\n"
@@ -203,6 +200,10 @@ def synchronize_seed(args, rank, shard_id):
 
     log_all(f"Using seed: {seed} for shard_id={shard_id}")
     return seed
+
+
+import torch_optimizer as optimizers # https://github.com/jettify/pytorch-optimizer/
+from optim.lilith import Lilith
 
 def get_opt_class(opt_name):
     # Map of optimizer name to class. Assumes all optimizer classes are in the `torch_optimizer` package.
@@ -250,6 +251,36 @@ def get_opt_class(opt_name):
     return opt_class
 
 
+from torch.optim.lr_scheduler import (SequentialLR, LinearLR, StepLR, MultiStepLR,
+                                      ExponentialLR, ReduceLROnPlateau, CyclicLR,
+                                      OneCycleLR, CosineAnnealingLR, CosineAnnealingWarmRestarts)
+
+def build_lr_scheduler(optimizer, scheduler_type, warmup_epochs, total_epochs, **kwargs):
+    warmup_lr_scheduler = LinearLR(optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs)
+
+    if scheduler_type == "StepLR":
+        scheduler = StepLR(optimizer, step_size=kwargs.get('step_size', 30), gamma=kwargs.get('gamma', 0.1))
+    elif scheduler_type == "MultiStepLR":
+        scheduler = MultiStepLR(optimizer, milestones=kwargs.get('milestones', [30, 60]), gamma=kwargs.get('gamma', 0.1))
+    elif scheduler_type == "ExponentialLR":
+        scheduler = ExponentialLR(optimizer, gamma=kwargs.get('gamma', 0.95))
+    elif scheduler_type == "CyclicLR":
+        scheduler = CyclicLR(optimizer, base_lr=kwargs.get('base_lr', 0.001), max_lr=kwargs.get('max_lr', 0.01),
+                             step_size_up=kwargs.get('step_size_up', 2000))
+    elif scheduler_type == "OneCycleLR":
+        scheduler = OneCycleLR(optimizer, max_lr=kwargs.get('max_lr', 0.01), total_steps=total_epochs)
+    elif scheduler_type == "CosineAnnealingLR":
+        scheduler = CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
+    elif scheduler_type == "CosineAnnealingWarmRestarts":
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=kwargs.get('T_0', total_epochs), T_mult=kwargs.get('T_mult', 1))
+    else:
+        raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
+
+    combined_scheduler = SequentialLR(optimizer, schedulers=[warmup_lr_scheduler, scheduler], milestones=[warmup_epochs])
+
+    return combined_scheduler
+
+
 def main(args):
     t0 = time.time()
 
@@ -266,14 +297,14 @@ def main(args):
 
     log_0(f"Selected model with arch={args.arch}, params={params_to_string(params)}")
 
-    all_parameters = list(model.parameters())
+    #all_parameters = list(model.parameters())
     # General parameters don't contain the special _optim key
-    optimizer_params = [p for p in all_parameters if not hasattr(p, "_optim")]
+    #optimizer_params = [p for p in all_parameters if not hasattr(p, "_optim")]
 
     opt_class = get_opt_class(args.optimizer)
 
     optimizer = opt_class(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
+    lr_scheduler = build_lr_scheduler(optimizer, args.scheduler, warmup_epochs=args.warmup_epochs, total_epochs=args.max_epochs)
 
     # DeepSpeed engine
     model_engine, optimizer, _, _ = deepspeed.initialize(
@@ -533,8 +564,10 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
     parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
+    parser.add_argument("--warmup-epochs", type=int, default=5, help="Number of epochs to apply warmup LR schedule")
     parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
     parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
+    parser.add_argument("--scheduler", type=str, default="CosineAnnealingLR", help="LR scheduler to use for training")
     parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
 
     parser = deepspeed.add_config_arguments(parser)
