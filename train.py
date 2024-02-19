@@ -23,6 +23,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from models.model_loader import select_model, params_to_string
 
+import torch_optimizer as optimizers # https://github.com/jettify/pytorch-optimizer/
+
 # Prettify printing tensors when debugging
 import lovely_tensors as lt
 lt.monkey_patch()
@@ -162,10 +164,10 @@ def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc
     data["git_hash"] = git_hash
     data["timestamp"] = datetime_string
     data["seed"] = args.seed
-    data["optimizer"] = "AdamW"
     data["lr"] = args.lr
     data["weight_decay"] = args.weight_decay
     data["max_epochs"] = args.max_epochs
+    data["optimizer"] = args.optimizer
 
     record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value]
     text = "Experiment:\n" + "\n".join(record_lines) + "\n\n"
@@ -198,6 +200,50 @@ def synchronize_seed(args, rank, shard_id):
     log_all(f"Using seed: {seed} for shard_id={shard_id}")
     return seed
 
+def get_opt_class(opt_name):
+    # Map of optimizer name to class. Assumes all optimizer classes are in the `torch_optimizer` package.
+    optimizer_classes = {
+        "Adam": torch.optim.Adam,
+        "AdamW": torch.optim.AdamW,
+        "Ranger": optimizers.Ranger,
+        "RangerQH": optimizers.RangerQH,
+        "RangerVA": optimizers.RangerVA,
+        "A2GradExp": optimizers.A2GradExp,
+        "A2GradInc": optimizers.A2GradInc,
+        "A2GradUni": optimizers.A2GradUni,
+        "AccSGD": optimizers.AccSGD,
+        "AdaBelief": optimizers.AdaBelief,
+        "AdaBound": optimizers.AdaBound,
+        "Adafactor": optimizers.Adafactor,
+        "Adahessian": optimizers.Adahessian,
+        "AdaMod": optimizers.AdaMod,
+        "AdamP": optimizers.AdamP,
+        "AggMo": optimizers.AggMo,
+        "Apollo": optimizers.Apollo,
+        "DiffGrad": optimizers.DiffGrad,
+        "Lamb": optimizers.Lamb,
+        "LARS": optimizers.LARS,
+        "Lion": optimizers.Lion,
+        "Lookahead": optimizers.Lookahead,
+        "MADGRAD": optimizers.MADGRAD,
+        "NovoGrad": optimizers.NovoGrad,
+        "PID": optimizers.PID,
+        "QHAdam": optimizers.QHAdam,
+        "QHM": optimizers.QHM,
+        "RAdam": optimizers.RAdam,
+        "SGDP": optimizers.SGDP,
+        "SGDW": optimizers.SGDW,
+        "Shampoo": optimizers.Shampoo,
+        "SWATS": optimizers.SWATS,
+        "Yogi": optimizers.Yogi
+    }
+    
+    # Return the optimizer class
+    opt_class = optimizer_classes.get(opt_name)
+    if opt_class is None:
+        raise ValueError(f"Optimizer {opt_name} not found. Available optimizers: {list(optimizer_classes.keys())}")
+    return opt_class
+
 
 def main(args):
     t0 = time.time()
@@ -219,7 +265,9 @@ def main(args):
     # General parameters don't contain the special _optim key
     optimizer_params = [p for p in all_parameters if not hasattr(p, "_optim")]
 
-    optimizer = torch.optim.AdamW(optimizer_params, lr=args.lr, weight_decay=args.weight_decay)
+    opt_class = get_opt_class(args.optimizer)
+
+    optimizer = opt_class(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
 
     # DeepSpeed engine
@@ -451,7 +499,7 @@ def get_true_random_32bit_positive_integer():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
     parser.add_argument("--name", type=str, default="", help="Give your experiment a name")
-    parser.add_argument("--arch", type=str, default="vit_tiny", help="Model architecture defined in models/model_loader.py")
+    parser.add_argument("--arch", type=str, default="x_transformers", help="Model architecture defined in models/model_loader.py")
     parser.add_argument("--params", type=str, default="", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")
@@ -467,6 +515,7 @@ if __name__ == "__main__":
     parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
     parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
+    parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
 
     parser = deepspeed.add_config_arguments(parser)
 

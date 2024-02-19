@@ -25,3 +25,6 @@ lovely-tensors
 pandas
 seaborn
 matplotlib
+
+# Latest torch_optimizer
+git+https://github.com/jettify/pytorch-optimizer.git
