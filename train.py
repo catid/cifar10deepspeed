@@ -391,7 +391,7 @@ def main(args):
 
     # Training/validation loop
 
-    if is_main_process():
+    if args.wandb and is_main_process():
         wandb.init(project="cifar10deepspeed", name=args.name, config=args)
         wandb.run.log_code = False
 
@@ -445,7 +445,8 @@ def main(args):
 
             log_0(f"Epoch {epoch + 1} - TrainLoss={avg_train_loss:.4f}, ValLoss={avg_val_loss:.4f}, ValAcc={val_acc:.2f}%, Time={epoch_time:.2f} sec")
 
-            wandb.log({"avg_train_loss": avg_train_loss, "val_acc": val_acc, "avg_val_loss": avg_val_loss, "epoch": epoch, "wallclock_time": epoch_time})
+            if args.wandb:
+                wandb.log({"avg_train_loss": avg_train_loss, "val_acc": val_acc, "avg_val_loss": avg_val_loss, "epoch": epoch, "wallclock_time": epoch_time})
 
         # Check if validation loss has improved
         if val_acc > best_val_acc:
@@ -498,8 +499,9 @@ def main(args):
 
         record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt, num_params)
 
-        wandb.log({"best_val_loss": best_val_loss, "best_val_acc": best_val_acc})
-        wandb.finish()
+        if args.wandb:
+            wandb.log({"best_val_loss": best_val_loss, "best_val_acc": best_val_acc})
+            wandb.finish()
 
 def get_true_random_32bit_positive_integer():
     random_bytes = bytearray(os.urandom(4))
@@ -527,6 +529,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
     parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
     parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
+    parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
 
     parser = deepspeed.add_config_arguments(parser)
 
