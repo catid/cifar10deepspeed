@@ -25,6 +25,8 @@ from models.model_loader import select_model, params_to_string
 
 import torch_optimizer as optimizers # https://github.com/jettify/pytorch-optimizer/
 
+from optim.lilith import Lilith
+
 import wandb
 
 # Prettify printing tensors when debugging
@@ -210,24 +212,24 @@ def get_opt_class(opt_name):
         "Ranger": optimizers.Ranger,
         "RangerQH": optimizers.RangerQH,
         "RangerVA": optimizers.RangerVA,
-        "A2GradExp": optimizers.A2GradExp,
-        "A2GradInc": optimizers.A2GradInc,
-        "A2GradUni": optimizers.A2GradUni,
+        #"A2GradExp": optimizers.A2GradExp, # Doesn't support weight_decay arg
+        #"A2GradInc": optimizers.A2GradInc, # Doesn't support weight_decay arg
+        #"A2GradUni": optimizers.A2GradUni, # Doesn't support weight_decay arg
         "AccSGD": optimizers.AccSGD,
         "AdaBelief": optimizers.AdaBelief,
         "AdaBound": optimizers.AdaBound,
         "Adafactor": optimizers.Adafactor,
-        "Adahessian": optimizers.Adahessian,
+        #"Adahessian": optimizers.Adahessian, # RuntimeError
         "AdaMod": optimizers.AdaMod,
         "AdamP": optimizers.AdamP,
         "AggMo": optimizers.AggMo,
-        "Apollo": optimizers.Apollo,
+        #"Apollo": optimizers.Apollo, # Out of memory
         "DiffGrad": optimizers.DiffGrad,
         "Lamb": optimizers.Lamb,
         "LARS": optimizers.LARS,
         "Lion": optimizers.Lion,
-        "Lookahead": optimizers.Lookahead,
-        "MADGRAD": optimizers.MADGRAD,
+        #"Lookahead": optimizers.Lookahead, # Doesn't support lr arg
+        #"MADGRAD": optimizers.MADGRAD, # RuntimeError
         "NovoGrad": optimizers.NovoGrad,
         "PID": optimizers.PID,
         "QHAdam": optimizers.QHAdam,
@@ -235,11 +237,12 @@ def get_opt_class(opt_name):
         "RAdam": optimizers.RAdam,
         "SGDP": optimizers.SGDP,
         "SGDW": optimizers.SGDW,
-        "Shampoo": optimizers.Shampoo,
+        #"Shampoo": optimizers.Shampoo, # RuntimeError
         "SWATS": optimizers.SWATS,
-        "Yogi": optimizers.Yogi
+        "Yogi": optimizers.Yogi,
+        "Lilith": Lilith
     }
-    
+
     # Return the optimizer class
     opt_class = optimizer_classes.get(opt_name)
     if opt_class is None:
