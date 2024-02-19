@@ -102,6 +102,11 @@ tail -f results.txt
 ```
 
 
+## Weights & Biases
+
+To enable W&B, run `wandb login` before training to set up your API key.  Pass `--wandb` to the training script.  You will also need to specify a `--name` for the experiment as well when using this option, so that it shows up properly in W&B.
+
+
 ## Graph results
 
 You can combine all the `results.txt` files from the machines into one big text file and then graph the data all together:
