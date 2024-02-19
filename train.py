@@ -25,6 +25,8 @@ from models.model_loader import select_model, params_to_string
 
 import torch_optimizer as optimizers # https://github.com/jettify/pytorch-optimizer/
 
+import wandb
+
 # Prettify printing tensors when debugging
 import lovely_tensors as lt
 lt.monkey_patch()
@@ -389,6 +391,10 @@ def main(args):
 
     # Training/validation loop
 
+    if is_main_process():
+        wandb.init(project="cifar10deepspeed", name=args.name, config=args)
+        wandb.run.log_code = False
+
     for epoch in range(start_epoch, args.max_epochs):
         end_epoch = epoch
         start_time = time.time()
@@ -438,6 +444,8 @@ def main(args):
             tensorboard.add_histogram('output1', output_labels[1], global_step=epoch)
 
             log_0(f"Epoch {epoch + 1} - TrainLoss={avg_train_loss:.4f}, ValLoss={avg_val_loss:.4f}, ValAcc={val_acc:.2f}%, Time={epoch_time:.2f} sec")
+
+            wandb.log({"avg_train_loss": avg_train_loss, "val_acc": val_acc, "avg_val_loss": avg_val_loss, "epoch": epoch, "wallclock_time": epoch_time})
 
         # Check if validation loss has improved
         if val_acc > best_val_acc:
@@ -489,6 +497,9 @@ def main(args):
         num_params = sum(p.numel() for p in model.parameters())
 
         record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc, end_epoch, dt, num_params)
+
+        wandb.log({"best_val_loss": best_val_loss, "best_val_acc": best_val_acc})
+        wandb.finish()
 
 def get_true_random_32bit_positive_integer():
     random_bytes = bytearray(os.urandom(4))

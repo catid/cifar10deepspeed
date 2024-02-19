@@ -4,6 +4,7 @@ gdown
 # Training pipeline
 deepspeed
 tensorboard
+wandb
 Pillow
 einops
 
