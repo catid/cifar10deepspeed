@@ -13,12 +13,13 @@ def handle_client_connection(client_socket):
             print(f"Executing: {command}")
             process = subprocess.Popen(command, shell=True)
             process.wait()
+            client_socket.sendall(b"Task Completed")  # Send completion message back to client
     finally:
         client_socket.close()
 
 def main():
     host = '0.0.0.0'
-    port = 9200
+    port = 5920
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((host, port))
