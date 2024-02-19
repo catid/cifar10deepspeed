@@ -316,6 +316,13 @@ def main(args):
 
     log_all(f"rank = {rank}, num_shards = {num_gpus}, shard_id={shard_id}, train_batch_size = {train_batch_size}, data_loader_batch_size = {data_loader_batch_size}, steps_per_print = {steps_per_print}, seed={seed}")
 
+    # Weights & Biases
+    if args.wandb and is_main_process():
+        if not args.name:
+            raise "The --name argument is required when using --wandb"
+        wandb.init(project="cifar10deepspeed", name=args.name, config=args)
+        wandb.run.log_code = False
+
     num_loader_threads = os.cpu_count()//2
     crop_w = 32
     crop_h = 32
@@ -390,10 +397,6 @@ def main(args):
             log_all("No checkpoint found - Starting training from scratch")
 
     # Training/validation loop
-
-    if args.wandb and is_main_process():
-        wandb.init(project="cifar10deepspeed", name=args.name, config=args)
-        wandb.run.log_code = False
 
     for epoch in range(start_epoch, args.max_epochs):
         end_epoch = epoch
