@@ -18,7 +18,7 @@ def send_task_to_server(command, server, completion_callback):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((server_address, int(server_port)))
-            print(f"Sending task to {server_address}")
+            print(f"Sending task to {server_address}: {command}")
             sock.sendall(command.encode('utf-8'))
             # Wait for the task to complete
             response = sock.recv(1024)
@@ -44,8 +44,9 @@ def task_distributor(commands, servers):
     distribute_next_task()
 
 def generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps):
-    learning_rates = np.linspace(lr_start, lr_end, lr_steps)
-    weight_decays = np.linspace(wd_start, wd_end, wd_steps)
+    learning_rates = np.logspace(np.log10(lr_start), np.log10(lr_end), lr_steps)
+    weight_decays = np.logspace(np.log10(wd_start), np.log10(wd_end), wd_steps)
+
     for lr_index, lr in enumerate(learning_rates):
         for wd_index, wd in enumerate(weight_decays):
             # Using indices in the name to represent grid position
@@ -58,10 +59,13 @@ def main():
         print("No servers found in hostfile.")
         return
 
-    lr_start, lr_end, lr_steps = 0.0001, 0.005, 12
-    wd_start, wd_end, wd_steps = 0.0001, 0.005, 12
+    lr_start, lr_end, lr_steps = 0.00001, 0.005, 12
+    wd_start, wd_end, wd_steps = 0.00001, 0.005, 12
 
     commands = list(generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps))
+    print("Running the following sweep:")
+    for command in commands:
+        print(f"{command}")
     task_distributor(commands, servers)
 
 if __name__ == '__main__':
