@@ -46,9 +46,11 @@ def task_distributor(commands, servers):
 def generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps):
     learning_rates = np.linspace(lr_start, lr_end, lr_steps)
     weight_decays = np.linspace(wd_start, wd_end, wd_steps)
-    for lr in learning_rates:
-        for wd in weight_decays:
-            yield f"./launch_local_train.sh --wandb --lr {lr} --weight-decay {wd} --reset --name \"lr{lr}wd{wd}\""
+    for lr_index, lr in enumerate(learning_rates):
+        for wd_index, wd in enumerate(weight_decays):
+            # Using indices in the name to represent grid position
+            name = f"grid-lr{lr_index}_wd{wd_index}"
+            yield f"./launch_local_train.sh --wandb --lr {lr} --weight-decay {wd} --reset --name \"{name}\""
 
 def main():
     servers = read_servers_from_hostfile("hostfile")
