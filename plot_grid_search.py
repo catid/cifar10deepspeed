@@ -57,7 +57,7 @@ def parse_experiment_data(filepath):
 
     data = []
     for exp in experiments:
-        name, best_val_acc, lr, weight_decay = exp["name"], exp["best_val_acc"], exp["lr"], exp["weight_decay"]
+        name, best_val_acc, lr, weight_decay = exp["name"], float(exp["best_val_acc"]), float(exp["lr"]), float(exp["weight_decay"])
         print(f"name, best_val_acc, lr, weight_decay = {name, best_val_acc, lr, weight_decay}")
         data.append((lr, weight_decay, best_val_acc))
 
@@ -89,8 +89,8 @@ def plot_heatmap(data, output_filename="grid_search_result.png"):
         pivot_table[lr_idx, wd_idx] = acc
 
     # Ensure proper formatting of the numbers
-    formatted_lr = ['{:.2e}'.format(float(x)) for x in lr_sorted]
-    formatted_wd = ['{:.2e}'.format(float(x)) for x in wd_sorted]
+    formatted_lr = ['{:.2e}'.format(x) for x in lr_sorted]
+    formatted_wd = ['{:.2e}'.format(x) for x in wd_sorted]
 
     # Plot the heatmap
     plt.figure(figsize=(10, 8))
@@ -100,7 +100,7 @@ def plot_heatmap(data, output_filename="grid_search_result.png"):
     # Set the axis labels
     ax.set_xlabel('Weight Decay')
     ax.set_ylabel('Learning Rate')
-    ax.set_title('Heatmap of Best Validation Accuracy')
+    ax.set_title('Validation Accuracy for Different LR/WD')
 
     # Fix for the cut-off issues
     plt.tight_layout()
