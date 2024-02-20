@@ -4,16 +4,61 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
+def extract_experiments_from_text(text):
+    """
+    Parses the given text file into an array of objects with fields corresponding to the experiment details.
+    
+    Args:
+    text (str): A string containing the experiment details.
+    
+    Returns:
+    list of dicts: A list of dictionaries, each containing the details of one experiment.
+    """
+    # Define the regex pattern to capture the details of each experiment
+    experiment_pattern = re.compile(
+        r"Experiment:"
+        r".*?name:\s*(?P<name>grid-lr\d+_wd\d+)"
+        r".*?arch:\s*(?P<arch>[^\n]+)"
+        r".*?params:\s*(?P<params>[^\n]+)"
+        r".*?best_val_acc:\s*(?P<best_val_acc>[\d.]+(?:e-?\d+)?)"
+        r".*?best_train_loss:\s*(?P<best_train_loss>[\d.]+(?:e-?\d+)?)"
+        r".*?best_val_loss:\s*(?P<best_val_loss>[\d.]+(?:e-?\d+)?)"
+        r".*?end_epoch:\s*(?P<end_epoch>\d+)"
+        r".*?train_seconds:\s*(?P<train_seconds>[\d.]+(?:e-?\d+)?)"
+        r".*?num_params:\s*(?P<num_params>\d+)"
+        r".*?git_hash:\s*(?P<git_hash>[^\n]+)"
+        r".*?timestamp:\s*(?P<timestamp>[^\n]+)"
+        r".*?seed:\s*(?P<seed>\d+)"
+        r".*?lr:\s*(?P<lr>[\d.]+(?:e-?\d+)?)"
+        r".*?weight_decay:\s*(?P<weight_decay>[\d.]+(?:e-?\d+)?)"
+        r".*?max_epochs:\s*(?P<max_epochs>\d+)"
+        r".*?optimizer:\s*(?P<optimizer>[^\n]+)"
+        r".*?scheduler:\s*(?P<scheduler>[^\n]+)",
+        re.DOTALL
+    )
+
+    # Find all matches in the text
+    matches = experiment_pattern.finditer(text)
+
+    # Create a list of dictionaries for each match
+    experiments = []
+    for match in matches:
+        experiment_data = match.groupdict()
+        experiments.append(experiment_data)
+
+    return experiments
+
+
 def parse_experiment_data(filepath):
     with open(filepath, 'r') as file:
         content = file.read()
 
-    pattern = re.compile(r"Experiment:.*?name: (lr.*?wd.*?)\n.*?lr: (0\.\d+).*?weight_decay: (0\.\d+).*?best_val_acc: (\d+\.\d+)", re.DOTALL)
-    matches = pattern.findall(content)
-    
+    experiments = extract_experiments_from_text(content)
+
     data = []
-    for name, lr, weight_decay, best_val_acc in matches:
-        lr, weight_decay, best_val_acc = map(float, [lr, weight_decay, best_val_acc])
+    for exp in experiments:
+        name, best_val_acc, lr, weight_decay = exp["name"], exp["best_val_acc"], exp["lr"], exp["weight_decay"]
+        print(f"name, best_val_acc, lr, weight_decay = {name, best_val_acc, lr, weight_decay}")
         data.append((lr, weight_decay, best_val_acc))
 
     return data
@@ -28,7 +73,7 @@ def plot_heatmap(data, output_filename="grid_search_result.png"):
     data_array = np.array(data)
     lr_sorted = sorted(set(data_array[:, 0]))
     wd_sorted = sorted(set(data_array[:, 1]))
-    
+
     # Identify missing data points
     missing_points = identify_missing_data_points(data, lr_sorted, wd_sorted)
     print(f"Grid dimensions: {len(lr_sorted)} LR x {len(wd_sorted)} WD")
@@ -44,8 +89,8 @@ def plot_heatmap(data, output_filename="grid_search_result.png"):
         pivot_table[lr_idx, wd_idx] = acc
 
     # Ensure proper formatting of the numbers
-    formatted_lr = ['{:.2e}'.format(x) for x in lr_sorted]
-    formatted_wd = ['{:.2e}'.format(x) for x in wd_sorted]
+    formatted_lr = ['{:.2e}'.format(float(x)) for x in lr_sorted]
+    formatted_wd = ['{:.2e}'.format(float(x)) for x in wd_sorted]
 
     # Plot the heatmap
     plt.figure(figsize=(10, 8))
