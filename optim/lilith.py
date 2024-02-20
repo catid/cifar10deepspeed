@@ -1,3 +1,5 @@
+# From https://github.com/euclaise/supertrainer2000/blob/master/supertrainer2k/optim/lilith.py
+
 import torch
 from torch.optim import Optimizer
 

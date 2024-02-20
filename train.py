@@ -469,21 +469,11 @@ def main(args):
             # Note: Tensorboard needs NCHW uint8
             input_images = examples[0]
             input_labels = examples[1]
-            output_labels = examples[2]
+            #output_labels = examples[2]
 
             tensorboard.add_images('input', input_images, global_step=epoch)
             tensorboard.add_scalar('label0', input_labels[0], global_step=epoch)
             tensorboard.add_scalar('label1', input_labels[1], global_step=epoch)
-
-            if output_labels[0].nelement() != 0:  # Checks if the tensor is not empty
-                tensorboard.add_histogram('output0', output_labels[0], global_step=epoch)
-            else:
-                print(f"Skipping histogram for 'output0' at epoch {epoch} due to empty data.")
-
-            if output_labels[1].nelement() != 0:  # Checks if the tensor is not empty
-                tensorboard.add_histogram('output1', output_labels[1], global_step=epoch)
-            else:
-                print(f"Skipping histogram for 'output1' at epoch {epoch} due to empty data.")
 
             log_0(f"Epoch {epoch + 1} - TrainLoss={avg_train_loss:.4f}, ValLoss={avg_val_loss:.4f}, ValAcc={val_acc:.2f}%, Time={epoch_time:.2f} sec")
 
