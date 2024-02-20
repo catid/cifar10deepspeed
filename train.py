@@ -1,9 +1,5 @@
-import os
-import shutil
-import time
-import random
+import os, shutil, time, random, json
 
-from pathlib import Path
 import numpy as np
 
 import torch
@@ -16,8 +12,6 @@ from deepspeed import log_dist
 import argparse
 
 from dataloader import CifarDataLoader
-
-from deepspeed.runtime.config import DeepSpeedConfig
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -282,7 +276,6 @@ def main(args):
     t0 = time.time()
 
     params = {}
-    #params['learning_rate'] = 0.001
 
     deepspeed.init_distributed(
         dist_backend="nccl",
@@ -294,14 +287,19 @@ def main(args):
 
     log_0(f"Selected model with arch={args.arch}, params={params_to_string(params)}")
 
-    #all_parameters = list(model.parameters())
-    # General parameters don't contain the special _optim key
-    #optimizer_params = [p for p in all_parameters if not hasattr(p, "_optim")]
-
     opt_class = get_opt_class(args.optimizer)
 
     optimizer = opt_class(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     lr_scheduler = build_lr_scheduler(optimizer, args.scheduler, warmup_epochs=args.warmup_epochs, total_epochs=args.max_epochs)
+
+    # Modify deepspeed configuration programmatically
+    with open(args.deepspeed_config) as f:
+        ds_config = json.load(f)
+
+    ds_config["fp16"]["enabled"] = not args.fp32_enabled
+
+    # Remove deepspeed_config from the args (we pass a dict into deepspeed.initialize)
+    args.deepspeed_config = None
 
     # DeepSpeed engine
     model_engine, optimizer, _, _ = deepspeed.initialize(
@@ -309,7 +307,7 @@ def main(args):
         model=model,
         optimizer=optimizer,
         lr_scheduler=lr_scheduler,
-        #config_params=args.deepspeed_config,  <- This should be in the args
+        config=ds_config,
         model_parameters=model.parameters())
 
     log_dir = f"{args.log_dir}/cifar10"
@@ -560,6 +558,7 @@ if __name__ == "__main__":
     parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
 
     # Hyperparameters
+    parser.add_argument("--fp32_enabled", action='store_true', help="Enable fp32 training (fp16 default)")
     parser.add_argument("--lr", type=float, default=9.18e-4, help="Learning rate for training")
     parser.add_argument("--weight-decay", type=float, default=1.5e-5, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
