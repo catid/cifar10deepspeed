@@ -56,8 +56,8 @@ def main():
         print("No servers found in hostfile.")
         return
 
-    lr_start, lr_end, lr_steps = 0.0001, 0.01, 8
-    wd_start, wd_end, wd_steps = 0.0001, 0.01, 8
+    lr_start, lr_end, lr_steps = 0.0001, 0.005, 12
+    wd_start, wd_end, wd_steps = 0.0001, 0.005, 12
 
     commands = list(generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps))
     task_distributor(commands, servers)
