@@ -1,5 +1,7 @@
 import socket
 import numpy as np
+from threading import Thread
+import time
 
 def read_servers_from_hostfile(filepath):
     servers = []
@@ -11,15 +13,35 @@ def read_servers_from_hostfile(filepath):
             servers.append(f"{server_address}:5920")
     return servers
 
-def distribute_task(command, server):
+def send_task_to_server(command, server, completion_callback):
     server_address, server_port = server.split(':')
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect((server_address, int(server_port)))
-        print(f"Sending task to {server_address}")
-        sock.sendall(command.encode('utf-8'))
-        # Wait for the task to complete
-        response = sock.recv(1024)
-        print(f"Response from server: {response.decode('utf-8')}")
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((server_address, int(server_port)))
+            print(f"Sending task to {server_address}")
+            sock.sendall(command.encode('utf-8'))
+            # Wait for the task to complete
+            response = sock.recv(1024)
+            print(f"Response from server {server_address}: {response.decode('utf-8')}")
+    except Exception as e:
+        print(f"Failed to send task to {server_address}: {e}")
+    finally:
+        completion_callback(server)
+
+def task_distributor(commands, servers):
+    available_servers = servers.copy()
+    
+    def mark_server_available(server):
+        available_servers.append(server)
+        distribute_next_task()
+    
+    def distribute_next_task():
+        while available_servers and commands:
+            server = available_servers.pop(0)
+            command = commands.pop(0)
+            Thread(target=send_task_to_server, args=(command, server, mark_server_available)).start()
+    
+    distribute_next_task()
 
 def generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps):
     learning_rates = np.linspace(lr_start, lr_end, lr_steps)
@@ -38,11 +60,7 @@ def main():
     wd_start, wd_end, wd_steps = 0.0001, 0.01, 8
 
     commands = list(generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps))
-    for command in commands:
-        for server in servers:
-            distribute_task(command, server)
-            # In this example, tasks are sent sequentially to each server
-            # Modify this loop for concurrent execution as needed
+    task_distributor(commands, servers)
 
 if __name__ == '__main__':
     main()
