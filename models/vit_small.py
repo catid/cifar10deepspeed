@@ -179,10 +179,10 @@ class LSA(nn.Module):
         self.temperature = nn.Parameter(torch.log(torch.tensor(dim_head ** -0.5)))
 
         self.attend = nn.Softmax(dim = -1)
-        self.to_qkv = Dyad(dim, inner_dim * 3, bias = False)
+        self.to_qkv = SNLinear(dim, inner_dim * 3, bias = False)
 
         self.to_out = nn.Sequential(
-            Dyad(inner_dim, dim),
+            SNLinear(inner_dim, dim),
             nn.Dropout(dropout)
         )
 
@@ -238,7 +238,7 @@ class SPT(nn.Module):
         self.to_patch_tokens = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
             nn.LayerNorm(patch_dim),
-            Dyad(patch_dim, dim)
+            nn.Linear(patch_dim, dim)
         )
 
     def forward(self, x):
