@@ -7,6 +7,7 @@ from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
+import numpy as np
 import math
 
 # helpers
@@ -15,7 +16,6 @@ def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
 # classes
-
 
 class SpectralNormedWeight(nn.Module):
     """SpectralNorm Layer. First sigma uses SVD, then power iteration."""
@@ -112,14 +112,59 @@ class SNLinear(nn.Linear):
         weight = self.get_weight()
         return F.linear(inputs, weight, self.bias)
 
+class Dyad(torch.nn.Module):
+    def __init__(self, dim_in, dim_out, dyad_dim=8, bias=True, use_dyad=False):
+        super().__init__()
+        assert dim_in % dyad_dim == 0, "Input dimension must be divisible by dyad dimension"
+        assert dim_out % dyad_dim == 0, "Output dimension must be divisible by dyad dimension"
+        self.dyad_dim, self.dim_in, self.dim_out, self.has_bias = dyad_dim, dim_in, dim_out, bias
+
+        if use_dyad:
+            # Initialize parameters
+            k = 1.0 / np.sqrt(dim_in * dyad_dim)
+            self.wu = torch.nn.Parameter(torch.empty(dyad_dim, dim_out//dyad_dim, dim_in//dyad_dim))
+            torch.nn.init.uniform_(self.wu, -k, k)
+            self.wl = torch.nn.Parameter(torch.empty(dyad_dim, dim_out//dyad_dim, dim_in//dyad_dim))
+            torch.nn.init.uniform_(self.wl, -k, k)
+            if self.has_bias:
+                self.bias = torch.nn.Parameter(torch.empty(dim_out, 1))
+                torch.nn.init.uniform_(self.bias, -k, k)
+        else:
+            self.net = SNLinear(dim_in, dim_out, bias=bias)
+
+        self.use_dyad = use_dyad
+
+    def forward(self, x):
+        if not self.use_dyad:
+            return self.net(x)
+
+        B, H, L = x.shape
+        x = x.reshape(B * H, self.dim_in)
+
+        x = x.transpose(0, 1)
+
+        # Reshape and compute transformations
+        x1 = x.reshape(self.dyad_dim, self.dim_in//self.dyad_dim, -1)
+        x2 = x.reshape(self.dim_in//self.dyad_dim, self.dyad_dim, -1).transpose(0, 1)
+        out = (self.wl.bmm(x1) + self.wu.bmm(x2)).reshape(self.dim_out, -1)
+
+        # Add bias if applicable
+        if self.has_bias:
+            out += self.bias
+        out = out.transpose(0, 1)
+
+        out = out.reshape(B, H, self.dim_out)
+
+        return out
+
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
+            Dyad(dim, hidden_dim, use_dyad=True),
             nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
+            Dyad(hidden_dim, dim, use_dyad=True),
             nn.Dropout(dropout)
         )
     def forward(self, x):
@@ -134,10 +179,10 @@ class LSA(nn.Module):
         self.temperature = nn.Parameter(torch.log(torch.tensor(dim_head ** -0.5)))
 
         self.attend = nn.Softmax(dim = -1)
-        self.to_qkv = SNLinear(dim, inner_dim * 3, bias = False)
+        self.to_qkv = Dyad(dim, inner_dim * 3, bias = False)
 
         self.to_out = nn.Sequential(
-            SNLinear(inner_dim, dim),
+            Dyad(inner_dim, dim),
             nn.Dropout(dropout)
         )
 
@@ -193,7 +238,7 @@ class SPT(nn.Module):
         self.to_patch_tokens = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
             nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, dim)
+            Dyad(patch_dim, dim)
         )
 
     def forward(self, x):
