@@ -161,10 +161,10 @@ class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
         self.net = nn.Sequential(
-            Dyad(dim, hidden_dim, use_dyad=True),
+            Dyad(dim, hidden_dim, use_dyad=False),
             nn.GELU(),
             nn.Dropout(dropout),
-            Dyad(hidden_dim, dim, use_dyad=True),
+            Dyad(hidden_dim, dim, use_dyad=False),
             nn.Dropout(dropout)
         )
     def forward(self, x):
