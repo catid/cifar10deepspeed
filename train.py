@@ -559,8 +559,8 @@ if __name__ == "__main__":
 
     # Hyperparameters
     parser.add_argument("--fp32_enabled", action='store_true', help="Enable fp32 training (fp16 default)")
-    parser.add_argument("--lr", type=float, default=9.18e-4, help="Learning rate for training")
-    parser.add_argument("--weight-decay", type=float, default=1.5e-5, help="Weight decay for training")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
+    parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
     parser.add_argument("--warmup-epochs", type=int, default=5, help="Number of epochs to apply warmup LR schedule")
     parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")

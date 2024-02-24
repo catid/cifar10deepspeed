@@ -50,8 +50,8 @@ def generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps):
     for lr_index, lr in enumerate(learning_rates):
         for wd_index, wd in enumerate(weight_decays):
             # Using indices in the name to represent grid position
-            name = f"lilly-lr{lr_index}_wd{wd_index}"
-            yield f"./launch_local_train.sh --wandb --optimizer Lilith --fp32 --lr {lr} --weight-decay {wd} --reset --name \"{name}\""
+            name = f"baseline-lr{lr_index}_wd{wd_index}"
+            yield f"./launch_local_train.sh --wandb --lr {lr} --weight-decay {wd} --reset --name \"{name}\""
 
 def main():
     servers = read_servers_from_hostfile("hostfile")
@@ -60,7 +60,7 @@ def main():
         return
 
     lr_start, lr_end, lr_steps = 0.00001, 0.005, 12
-    wd_start, wd_end, wd_steps = 0.00001, 0.005, 12
+    wd_start, wd_end, wd_steps = 0.0005, 0.2, 12
 
     commands = list(generate_commands(lr_start, lr_end, lr_steps, wd_start, wd_end, wd_steps))
     print("Running the following sweep:")
