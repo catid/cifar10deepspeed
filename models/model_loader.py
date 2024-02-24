@@ -61,7 +61,7 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "dim", 512)
         define_param(params_dict, "depth", 4)
         define_param(params_dict, "heads", 6)
-        define_param(params_dict, "mlp_dim", 1024)
+        define_param(params_dict, "mlp_dim", 256)
     if arch == "soft_moe":
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
