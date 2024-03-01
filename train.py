@@ -271,6 +271,50 @@ def build_lr_scheduler(optimizer, scheduler_type, warmup_epochs, total_epochs, *
 
     return combined_scheduler
 
+class WeightLimiter:
+    def __init__(self, model, start_epoch=10, end_epoch=200):
+        self.model = model
+        self.start_epoch = start_epoch
+        self.end_epoch = end_epoch
+
+        self.pruning_list = {}
+        self.smoothing_epochs_remaining = 0
+        self.smooth_interval = 5
+        self.k = 10
+
+    def apply(self, epoch):
+        if epoch < self.start_epoch or epoch > self.end_epoch:
+            return  # Do nothing outside the specified epoch range
+
+        if self.smoothing_epochs_remaining <= 0:
+            # Select weights to prune
+            self.pruning_list = {}
+            self.smoothing_epochs_remaining = self.smooth_interval
+
+            for name, param in self.model.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if param.dim != 2:
+                    continue
+                if all(dim > 1 for dim in param.shape):
+                    flat_param = param.data.view(-1)
+                    _, flat_indices = torch.topk(flat_param.abs(), self.k, largest=True, sorted=False)
+
+                    self.pruning_list[name] = [(idx, flat_param[idx].item()) for idx in flat_indices]
+
+        self.smoothing_epochs_remaining -= 1
+        frac = self.smoothing_epochs_remaining / self.smooth_interval
+
+        for name, param in self.model.named_parameters():
+            if not name in self.pruning_list:
+                continue
+
+            indices = self.pruning_list[name]
+            flat_param = param.data.view(-1)
+
+            for (idx, w0) in indices:
+                #print(f"Pruning {name} weight {idx} = {flat_param[idx]} to {w0} * {frac}")
+                flat_param[idx] = w0 * frac
 
 def main(args):
     t0 = time.time()
@@ -349,7 +393,7 @@ def main(args):
     if args.wandb and is_main_process():
         if not args.name:
             raise "The --name argument is required when using --wandb"
-        wandb.init(project="cifar10deepspeed", name=args.name, config=args)
+        wandb.init(project=args.project, name=args.name, config=args)
         wandb.run.log_code = False
 
     num_loader_threads = os.cpu_count()//2
@@ -427,11 +471,17 @@ def main(args):
 
     # Training/validation loop
 
+    if args.weight_hack:
+        weight_limiter = WeightLimiter(model)
+
     for epoch in range(start_epoch, args.max_epochs):
         end_epoch = epoch
         start_time = time.time()
 
         train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, image_dtype)
+
+        if args.weight_hack:
+            weight_limiter.apply(epoch)
 
         val_loss, correct, total, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine, image_dtype)
 
@@ -542,7 +592,6 @@ def get_true_random_32bit_positive_integer():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
-    parser.add_argument("--name", type=str, default="", help="Give your experiment a name")
     parser.add_argument("--arch", type=str, default="x_transformers", help="Model architecture defined in models/model_loader.py")
     parser.add_argument("--params", type=str, default="", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
@@ -555,17 +604,22 @@ if __name__ == "__main__":
     parser.add_argument("--notes", type=str, default="", help="Provide any additional notes about the experiment to record")
     parser.add_argument("--seed", type=int, default=-1, help="Seed for random numbers.  Set to -1 to pick a random seed")
     parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
+
     parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
+    parser.add_argument("--name", type=str, default="", help="Give your experiment a name")
+    parser.add_argument("--project", type=str, default="my_project", help="Collection of experiments on wandb")
 
     # Hyperparameters
     parser.add_argument("--fp32_enabled", action='store_true', help="Enable fp32 training (fp16 default)")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
-    parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight decay for training")
+    parser.add_argument("--weight-decay", type=float, default=0.1, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
     parser.add_argument("--warmup-epochs", type=int, default=5, help="Number of epochs to apply warmup LR schedule")
     parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
     parser.add_argument("--scheduler", type=str, default="CosineAnnealingWarmRestarts", help="LR scheduler to use for training")
     parser.add_argument("--patience", type=int, default=50, help="Patience for validation loss not decreasing before early stopping")
+
+    parser.add_argument("--weight-hack", action="store_true", help="Enable Weird Weight Hack")
 
     parser = deepspeed.add_config_arguments(parser)
 
