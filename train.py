@@ -20,8 +20,8 @@ from models.model_loader import select_model, params_to_string
 import wandb
 
 # Prettify printing tensors when debugging
-import lovely_tensors as lt
-lt.monkey_patch()
+#import lovely_tensors as lt
+#lt.monkey_patch()
 
 
 def log_0(msg):
