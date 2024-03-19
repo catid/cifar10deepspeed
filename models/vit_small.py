@@ -75,13 +75,13 @@ class LSA(nn.Module):
         k = self.to_k(x)
         v = self.to_v(x)
         
-        q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads_q)
-        k = rearrange(k, 'b n (h d) -> b h n d', h=self.heads_kv)
-        v = rearrange(v, 'b n (h d) -> b h n d', h=self.heads_kv)
+        q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads_q)
+        k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads_kv)
+        v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads_kv)
 
         out = flash_attn_func(q, k, v, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1), alibi_slopes=None, deterministic=False)
 
-        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = rearrange(out, 'b n h d -> b n (h d)')
         return self.to_out(out)
  
 class Transformer(nn.Module):
