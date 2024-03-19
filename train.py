@@ -592,7 +592,7 @@ def get_true_random_32bit_positive_integer():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Training")
-    parser.add_argument("--arch", type=str, default="x_transformers", help="Model architecture defined in models/model_loader.py")
+    parser.add_argument("--arch", type=str, default="vit_fa2", help="Model architecture defined in models/model_loader.py")
     parser.add_argument("--params", type=str, default="", help="Model architecture parameters defined in models/model_loader.py")
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--dataset-dir", type=str, default=str("cifar10"), help="Path to the dataset directory (default: ./cifar10/)")

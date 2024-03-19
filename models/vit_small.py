@@ -7,8 +7,6 @@ from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from flash_attn.flash_attn_interface import flash_attn_func
-
 import math
 
 # helpers
@@ -18,25 +16,101 @@ def pair(t):
 
 # classes
 
-# https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_for_small_dataset.py
 
-import torch
-import torch.nn.functional as F
-from torch import nn
+class SpectralNormedWeight(nn.Module):
+    """SpectralNorm Layer. First sigma uses SVD, then power iteration."""
 
-from einops import rearrange, repeat
-from einops.layers.torch import Rearrange
+    def __init__(
+        self,
+        weight: torch.Tensor,
+    ):
+        super().__init__()
+        self.weight = weight
+        with torch.no_grad():
+            _, s, vh = torch.linalg.svd(self.weight, full_matrices=False)
 
-from flash_attn import flash_attn_func
+        self.register_buffer("u", vh[0])
+        self.register_buffer("spectral_norm", s[0] * torch.ones(1))
 
-import math
+    def get_sigma(self, u: torch.Tensor, weight: torch.Tensor):
+        with torch.no_grad():
+            v = weight.mv(u)
+            v = nn.functional.normalize(v, dim=0)
+            u = weight.T.mv(v)
+            u = nn.functional.normalize(u, dim=0)
+            if self.training:
+                self.u.data.copy_(u)
 
-# helpers
+        return torch.einsum("c,cd,d->", v, weight, u)
 
-def pair(t):
-    return t if isinstance(t, tuple) else (t, t)
+    def forward(self):
+        """Normalize by largest singular value and rescale by learnable."""
+        sigma = self.get_sigma(u=self.u, weight=self.weight)
+        if self.training:
+            self.spectral_norm.data.copy_(sigma)
 
-# classes
+        return self.weight / sigma
+
+class SNLinear(nn.Linear):
+    """Spectral Norm linear from sigmaReparam.
+
+    Optionally, if 'stats_only' is `True`,then we
+    only compute the spectral norm for tracking
+    purposes, but do not use it in the forward pass.
+
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        init_multiplier: float = 1.0,
+        stats_only: bool = False,
+    ):
+        super().__init__(in_features, out_features, bias=bias)
+        self.stats_only = stats_only
+        self.init_multiplier = init_multiplier
+
+        self.init_std = 0.02 * init_multiplier
+        nn.init.trunc_normal_(self.weight, std=self.init_std)
+
+        # Handle normalization and add a learnable scalar.
+        self.spectral_normed_weight = SpectralNormedWeight(self.weight)
+        sn_init = self.spectral_normed_weight.spectral_norm
+
+        # Would have set sigma to None if `stats_only` but jit really disliked this
+        self.sigma = (
+            torch.ones_like(sn_init)
+            if self.stats_only
+            else nn.Parameter(
+                torch.zeros_like(sn_init).copy_(sn_init), requires_grad=True
+            )
+        )
+
+        self.register_buffer("effective_spectral_norm", sn_init)
+        self.update_effective_spec_norm()
+
+    def update_effective_spec_norm(self):
+        """Update the buffer corresponding to the spectral norm for tracking."""
+        with torch.no_grad():
+            s_0 = (
+                self.spectral_normed_weight.spectral_norm
+                if self.stats_only
+                else self.sigma
+            )
+            self.effective_spectral_norm.data.copy_(s_0)
+
+    def get_weight(self):
+        """Get the reparameterized or reparameterized weight matrix depending on mode
+        and update the external spectral norm tracker."""
+        normed_weight = self.spectral_normed_weight()
+        self.update_effective_spec_norm()
+        return self.weight if self.stats_only else normed_weight * self.sigma
+
+    def forward(self, inputs: torch.Tensor):
+        weight = self.get_weight()
+        return F.linear(inputs, weight, self.bias)
 
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
@@ -55,50 +129,59 @@ class FeedForward(nn.Module):
 class LSA(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
         super().__init__()
-        self.dropout = dropout
-        self.heads_q = heads * 2
-        self.heads_kv = heads // 2
-        inner_dim_q = dim_head * self.heads_q
-        inner_dim_kv = dim_head * self.heads_kv
+        inner_dim = dim_head *  heads
+        self.heads = heads
+        self.temperature = nn.Parameter(torch.log(torch.tensor(dim_head ** -0.5)))
 
-        self.to_q = nn.Linear(dim, inner_dim_q, bias = False)
-        self.to_k = nn.Linear(dim, inner_dim_kv, bias = False)
-        self.to_v = nn.Linear(dim, inner_dim_kv, bias = False)
+        self.attend = nn.Softmax(dim = -1)
+        self.to_qkv = SNLinear(dim, inner_dim * 3, bias = False)
 
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim_q, dim),
+            SNLinear(inner_dim, dim),
             nn.Dropout(dropout)
         )
 
+        self.scale = dim_head ** -0.5
+        self.scale_inverse = dim_head ** 0.5
+        self.option = 'baseline'
+
     def forward(self, x):
-        q = self.to_q(x)
-        k = self.to_k(x)
-        v = self.to_v(x)
-        
-        q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads_q)
-        k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads_kv)
-        v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads_kv)
+        qkv = self.to_qkv(x).chunk(3, dim = -1)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
 
-        out = flash_attn_func(q, k, v, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1), alibi_slopes=None, deterministic=False)
+        dots = torch.matmul(q, k.transpose(-1, -2))
 
-        out = rearrange(out, 'b n h d -> b n (h d)')
+        if self.option == 'baseline':
+            dots = dots * self.temperature.exp()
+        elif self.option == 'sqrtd':
+            dots = dots / torch.clamp(dots.std(dim=-1, keepdim=True), max=self.scale_inverse, min=1e-6)
+        elif self.option == 'inf':
+            dots = dots / torch.clamp(dots.std(dim=-1, keepdim=True), min=1e-6)
+        else:
+            exit(1)
+
+        mask = torch.eye(dots.shape[-1], device = dots.device, dtype = torch.bool)
+        mask_value = -torch.finfo(dots.dtype).max
+        dots = dots.masked_fill(mask, mask_value)
+
+        attn = self.attend(dots)
+
+        out = torch.matmul(attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
- 
+
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                nn.LayerNorm(dim),
                 LSA(dim, heads = heads, dim_head = dim_head, dropout = dropout),
                 FeedForward(dim, mlp_dim, dropout = dropout)
             ]))
     def forward(self, x):
-        for norm, attn, ff in self.layers:
-            x = norm(x)
+        for attn, ff in self.layers:
             x = attn(x) + x
-            x = norm(x)
             x = ff(x) + x
         return x
 
@@ -128,7 +211,7 @@ class ViT(nn.Module):
         assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
 
         num_patches = (image_height // patch_height) * (image_width // patch_width)
-        #patch_dim = channels * patch_height * patch_width
+        patch_dim = channels * patch_height * patch_width
         assert pool in {'cls', 'mean'}, 'pool type must be either cls (cls token) or mean (mean pooling)'
 
         self.to_patch_embedding = SPT(dim = dim, patch_size = patch_size, channels = channels)
