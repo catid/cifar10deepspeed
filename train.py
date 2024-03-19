@@ -618,6 +618,7 @@ if __name__ == "__main__":
     parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
     parser.add_argument("--scheduler", type=str, default="CosineAnnealingWarmRestarts", help="LR scheduler to use for training")
     parser.add_argument("--patience", type=int, default=50, help="Patience for validation loss not decreasing before early stopping")
+    parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate for training")
 
     parser.add_argument("--weight-hack", action="store_true", help="Enable Weird Weight Hack")
 

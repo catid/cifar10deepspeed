@@ -158,6 +158,9 @@ def apply_default_model_params(arch, params_dict):
 def select_model(args):
     params_dict = get_model_params(args.arch, args.params)
 
+    dropout = getattr(args, 'dropout', 0.0)
+    print(f"Using dropout rate of {dropout}")
+
     if args.arch == "x_transformers":
         from x_transformers import ViTransformerWrapper, Encoder
 
@@ -189,8 +192,8 @@ def select_model(args):
             depth = params_dict["depth"],
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_local":
@@ -203,8 +206,8 @@ def select_model(args):
             depth = params_dict["depth"],
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
-            dropout = 0.1,
-            emb_dropout = 0.1,
+            dropout = dropout,
+            emb_dropout = dropout,
             local_window_size = params_dict["local_window_size"],
             tile_size = params_dict["tile_size"],
             tile_window_size = params_dict["tile_window_size"]
@@ -221,8 +224,8 @@ def select_model(args):
             heads = params_dict["heads"],
             num_experts = params_dict["num_experts"],
             expert_mult = params_dict["expert_mult"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_tiny_sparse":
@@ -237,8 +240,8 @@ def select_model(args):
             mlp_dim = params_dict["mlp_dim"],
             in_splits = params_dict["in_splits"],
             out_splits = params_dict["out_splits"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "s4":
@@ -248,7 +251,7 @@ def select_model(args):
             d_output=10,
             d_model=params_dict["d_model"],
             n_layers=params_dict["n_layers"],
-            dropout=0.2,
+            dropout=dropout,
             prenorm=False
         )
 
@@ -290,8 +293,8 @@ def select_model(args):
             depth = params_dict["depth"],
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_bojan_flat_and_mlp":
@@ -305,8 +308,8 @@ def select_model(args):
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
             mlp_size = params_dict["mlp_size"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_tiny_2ff":
@@ -319,8 +322,8 @@ def select_model(args):
             depth = params_dict["depth"],
             heads = params_dict["heads"],
             mlp_dim = params_dict["mlp_dim"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_tiny_fff":
@@ -334,8 +337,8 @@ def select_model(args):
             heads = params_dict["heads"],
             fff_depth = params_dict["fff_depth"],
             fff_count = params_dict["fff_count"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_tiny_fff_fanout":
@@ -350,8 +353,8 @@ def select_model(args):
             fff_depth = params_dict["fff_depth"],
             fff_count = params_dict["fff_count"],
             fff_fanout = params_dict["fff_fanout"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_tiny_2fff":
@@ -365,8 +368,8 @@ def select_model(args):
             heads = params_dict["heads"],
             fff_depth = params_dict["fff_depth"],
             fff_count = params_dict["fff_count"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     if args.arch == "vit_tiny_fff_and_mlp":
@@ -381,8 +384,8 @@ def select_model(args):
             fff_depth = params_dict["fff_depth"],
             fff_count = params_dict["fff_count"],
             mlp_size = params_dict["mlp_size"],
-            dropout = 0.1,
-            emb_dropout = 0.1
+            dropout = dropout,
+            emb_dropout = dropout
         )
 
     raise Exception("Unrecognized model architecture: Check models/model_loader.py for defined options")
