@@ -15,20 +15,18 @@ Experimental runs (git hash, results, all parameters) are recorded to a results 
 
 Install conda: https://docs.conda.io/projects/miniconda/en/latest/index.html
 
-Make sure your Nvidia drivers are installed properly by running `nvidia-smi`.  If not, you may need to run something like `sudo apt install nvidia-driver-535-server` or newer.
+Make sure your Nvidia drivers are installed properly by running `nvidia-smi`.  The best way is to install the latest CUDA toolkit from https://developer.nvidia.com/cuda-downloads which includes the latest drivers.
 
-Install CUDA toolkit:
+I'm using CUDA 12.4.  If you have issues it might make sense to upgrade.
 
-```bash
-# Here's how to do it on Ubuntu:
-sudo apt install nvidia-cuda-toolkit
-```
-
-Make sure you can use `nvcc`:
+Make sure you can use `nvcc` and `nvidia-smi` and the CUDA version matches on both:
 
 ```bash
+nvidia-smi
 nvcc --version
 ```
+
+You need `zip`: `sudo apt install zip`
 
 Setup the software from this repo:
 
@@ -36,22 +34,20 @@ Setup the software from this repo:
 git clone https://github.com/catid/cifar10deepspeed
 cd cifar10deepspeed
 
-conda create -n train python=3.10
-conda activate train
-
-# Update this from https://pytorch.org/get-started/locally/
-pip install --upgrade torch --extra-index-url https://download.pytorch.org/whl/cu118
-
-# Update this from https://github.com/NVIDIA/DALI#installing-dali
-pip install --upgrade nvidia-dali-cuda110 --extra-index-url https://developer.download.nvidia.com/compute/redist
+conda create -n train python=3.10 -y && conda activate train
 
 pip install -U -r requirements.txt
 
+# Work-around for https://github.com/Dao-AILab/flash-attention/issues/867
+# Sadly this takes a while...
+pip install --no-build-isolation flash-attn==2.3.0
+```
+
+Setup dataset:
+
+```bash
 # Extract the dataset and produce labels
 gdown 'https://drive.google.com/uc?id=1r0Rb7dfex7g3ovRacIvoEbTkXkrgmboe'
-
-# Install the zip/unzip CLI tools
-sudo apt install zip
 
 unzip cifar10.zip
 python prepare_dataset.py
@@ -62,7 +58,7 @@ python prepare_dataset.py
 
 ```bash
 conda activate train
-./launch_local_train.sh
+./launch_local_train.sh --reset
 ```
 
 The training process will stop after 50 epochs without any improvement in validation loss, which ends up being about 175 epochs, which is about 6 minutes with my hardware.
@@ -166,5 +162,5 @@ Edit the `hostfile` to specify the list of nodes in the training cluster.  They 
 The dataset must be at the same path on each computer participating in the training cluster.  I'd recommend just repeating these preparation steps on each computer in the cluster rather than using a network drive, since the dataset is small.
 
 ```bash
-./launch_distributed_train.sh
+./launch_distributed_train.sh --reset
 ```

@@ -56,17 +56,15 @@ class LSA(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
         super().__init__()
         self.dropout = dropout
-        self.heads_q = heads * 2
-        self.heads_kv = heads // 2
-        inner_dim_q = dim_head * self.heads_q
-        inner_dim_kv = dim_head * self.heads_kv
+        self.heads = heads
+        inner_dim = dim_head * heads
 
-        self.to_q = nn.Linear(dim, inner_dim_q, bias = False)
-        self.to_k = nn.Linear(dim, inner_dim_kv, bias = False)
-        self.to_v = nn.Linear(dim, inner_dim_kv, bias = False)
+        self.to_q = nn.Linear(dim, inner_dim, bias = False)
+        self.to_k = nn.Linear(dim, inner_dim, bias = False)
+        self.to_v = nn.Linear(dim, inner_dim, bias = False)
 
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim_q, dim),
+            nn.Linear(inner_dim, dim),
             nn.Dropout(dropout)
         )
 
@@ -74,16 +72,21 @@ class LSA(nn.Module):
         q = self.to_q(x)
         k = self.to_k(x)
         v = self.to_v(x)
-        
-        q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads_q)
-        k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads_kv)
-        v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads_kv)
 
-        out = flash_attn_func(q, k, v, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1))
+        q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads)
+        k = rearrange(k, 'b n (h d) -> b h n d', h=self.heads)
+        v = rearrange(v, 'b n (h d) -> b h n d', h=self.heads)
 
-        out = rearrange(out, 'b n h d -> b n (h d)')
+        out = F.scaled_dot_product_attention(
+            q, k, v,
+            attn_mask=None,
+            dropout_p=self.dropout,
+            is_causal=False,
+            scale=None)
+
+        out = rearrange(out, 'b h n d -> b n (h d)', h=self.heads)
         return self.to_out(out)
- 
+
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         super().__init__()

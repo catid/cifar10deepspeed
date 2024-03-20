@@ -1,3 +1,10 @@
+# PyTorch 2.2+ CUDA 12.1+
+torch
+torchvision
+torchaudio
+
+nvidia-dali-cuda120
+
 # Downloading dataset
 gdown
 
@@ -29,5 +36,3 @@ matplotlib
 
 # Latest torch_optimizer
 git+https://github.com/jettify/pytorch-optimizer.git
-
-flash-attn
