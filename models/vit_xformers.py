@@ -46,39 +46,84 @@ class FeedForward(nn.Module):
         y = self.net(x)
         return y
 
-class LSA(nn.Module):
-    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
-        super().__init__()
-        self.dropout = dropout
-        self.heads = heads
-        inner_dim = dim_head * heads
+use_gqa = True
 
-        self.to_q = nn.Linear(dim, inner_dim, bias = False)
-        self.to_k = nn.Linear(dim, inner_dim, bias = False)
-        self.to_v = nn.Linear(dim, inner_dim, bias = False)
+if use_gqa:
 
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, dim),
-            nn.Dropout(dropout)
-        )
+    class LSA(nn.Module):
+        def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+            super().__init__()
+            self.dropout = dropout
+            self.heads_q = heads
+            self.heads_kv = heads // 2
+            inner_dim_q = dim_head * self.heads_q
+            inner_dim_kv = dim_head * self.heads_kv
 
-    def forward(self, x):
-        q = self.to_q(x)
-        k = self.to_k(x)
-        v = self.to_v(x)
+            self.to_q = nn.Linear(dim, inner_dim_q, bias = False)
+            self.to_k = nn.Linear(dim, inner_dim_kv, bias = False)
+            self.to_v = nn.Linear(dim, inner_dim_kv, bias = False)
 
-        q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads)
-        k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads)
-        v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads)
+            self.to_out = nn.Sequential(
+                nn.Linear(inner_dim_q, dim),
+                nn.Dropout(dropout)
+            )
 
-        out = xops.memory_efficient_attention(
-            q, k, v,
-            attn_bias=None, #xops.LowerTriangularMask(),
-            p=self.dropout,
-            scale=None)
+        def forward(self, x):
+            q = self.to_q(x)
+            k = self.to_k(x)
+            v = self.to_v(x)
 
-        out = rearrange(out, 'b n h d -> b n (h d)', h=self.heads)
-        return self.to_out(out)
+            q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads_q)
+            k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads_kv)
+            v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads_kv)
+
+            k = k.repeat(1, 1, self.heads_q // self.heads_kv, 1)
+            v = v.repeat(1, 1, self.heads_q // self.heads_kv, 1)
+
+            out = xops.memory_efficient_attention(
+                q, k, v,
+                attn_bias=None, #xops.LowerTriangularMask(),
+                p=self.dropout,
+                scale=None)
+
+            out = rearrange(out, 'b n h d -> b n (h d)', h=self.heads_q)
+            return self.to_out(out)
+
+else:
+
+    class LSA(nn.Module):
+        def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+            super().__init__()
+            self.dropout = dropout
+            self.heads = heads
+            inner_dim = dim_head * heads
+
+            self.to_q = nn.Linear(dim, inner_dim, bias = False)
+            self.to_k = nn.Linear(dim, inner_dim, bias = False)
+            self.to_v = nn.Linear(dim, inner_dim, bias = False)
+
+            self.to_out = nn.Sequential(
+                nn.Linear(inner_dim, dim),
+                nn.Dropout(dropout)
+            )
+
+        def forward(self, x):
+            q = self.to_q(x)
+            k = self.to_k(x)
+            v = self.to_v(x)
+
+            q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads)
+            k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads)
+            v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads)
+
+            out = xops.memory_efficient_attention(
+                q, k, v,
+                attn_bias=None, #xops.LowerTriangularMask(),
+                p=self.dropout,
+                scale=None)
+
+            out = rearrange(out, 'b n h d -> b n (h d)', h=self.heads)
+            return self.to_out(out)
 
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):

@@ -72,7 +72,7 @@ if use_qkvpacked:
 
             out = flash_attn_qkvpacked_func(qkv, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1))
 
-            out = rearrange(out, 'b n h d -> b n (h d)')
+            out = rearrange(out, 'b n h d -> b n (h d)', h = self.heads)
             return self.to_out(out)
 
 else:
@@ -82,7 +82,7 @@ else:
             super().__init__()
             self.dropout = dropout
             self.heads_q = heads
-            self.heads_kv = heads # // 2
+            self.heads_kv = heads // 2
             inner_dim_q = dim_head * self.heads_q
             inner_dim_kv = dim_head * self.heads_kv
 
@@ -106,14 +106,19 @@ else:
 
             out = flash_attn_func(q, k, v, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1))
 
-            out = rearrange(out, 'b n h d -> b n (h d)')
+            out = rearrange(out, 'b n h d -> b n (h d)', h=self.heads_q)
             return self.to_out(out)
  
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         super().__init__()
         self.layers = nn.ModuleList([])
-        for _ in range(depth):
+        for d in range(depth):
+            #if d == 1:
+            #    from product_key_memory import PKM
+            #    ff = PKM(dim, heads = heads, dim_head = 128, num_keys = 256, topk = 32)
+            #else:
+            #    ff = FeedForward(dim, mlp_dim, dropout = dropout)
             self.layers.append(nn.ModuleList([
                 nn.LayerNorm(dim),
                 LSA(dim, heads = heads, dim_head = dim_head, dropout = dropout),
