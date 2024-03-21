@@ -7,9 +7,7 @@ from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from flash_attn.flash_attn_interface import flash_attn_func
-
-import math
+from flash_attn.flash_attn_interface import flash_attn_func, flash_attn_qkvpacked_func
 
 # helpers
 
@@ -26,8 +24,6 @@ from torch import nn
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
-
-from flash_attn import flash_attn_func
 
 import math
 
@@ -52,37 +48,66 @@ class FeedForward(nn.Module):
         y = self.net(x)
         return y
 
-class LSA(nn.Module):
-    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
-        super().__init__()
-        self.dropout = dropout
-        self.heads_q = heads * 2
-        self.heads_kv = heads // 2
-        inner_dim_q = dim_head * self.heads_q
-        inner_dim_kv = dim_head * self.heads_kv
+use_qkvpacked = True
 
-        self.to_q = nn.Linear(dim, inner_dim_q, bias = False)
-        self.to_k = nn.Linear(dim, inner_dim_kv, bias = False)
-        self.to_v = nn.Linear(dim, inner_dim_kv, bias = False)
+if use_qkvpacked:
 
-        self.to_out = nn.Sequential(
-            nn.Linear(inner_dim_q, dim),
-            nn.Dropout(dropout)
-        )
+    class LSA(nn.Module):
+        def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+            super().__init__()
+            self.dropout = dropout
+            self.heads = heads
+            inner_dim = dim_head * self.heads
 
-    def forward(self, x):
-        q = self.to_q(x)
-        k = self.to_k(x)
-        v = self.to_v(x)
-        
-        q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads_q)
-        k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads_kv)
-        v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads_kv)
+            self.to_qkv = nn.Linear(dim, inner_dim * 3, bias = False)
 
-        out = flash_attn_func(q, k, v, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1))
+            self.to_out = nn.Sequential(
+                nn.Linear(inner_dim, dim),
+                nn.Dropout(dropout)
+            )
 
-        out = rearrange(out, 'b n h d -> b n (h d)')
-        return self.to_out(out)
+        def forward(self, x):
+            qkv = self.to_qkv(x)
+            qkv = rearrange(qkv, 'b n (a h d) -> b n a h d', a = 3, h = self.heads)  
+
+            out = flash_attn_qkvpacked_func(qkv, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1))
+
+            out = rearrange(out, 'b n h d -> b n (h d)')
+            return self.to_out(out)
+
+else:
+
+    class LSA(nn.Module):
+        def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+            super().__init__()
+            self.dropout = dropout
+            self.heads_q = heads
+            self.heads_kv = heads # // 2
+            inner_dim_q = dim_head * self.heads_q
+            inner_dim_kv = dim_head * self.heads_kv
+
+            self.to_q = nn.Linear(dim, inner_dim_q, bias = False)
+            self.to_k = nn.Linear(dim, inner_dim_kv, bias = False)
+            self.to_v = nn.Linear(dim, inner_dim_kv, bias = False)
+
+            self.to_out = nn.Sequential(
+                nn.Linear(inner_dim_q, dim),
+                nn.Dropout(dropout)
+            )
+
+        def forward(self, x):
+            q = self.to_q(x)
+            k = self.to_k(x)
+            v = self.to_v(x)
+
+            q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads_q)
+            k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads_kv)
+            v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads_kv)
+
+            out = flash_attn_func(q, k, v, dropout_p=self.dropout, softmax_scale=None, causal=False, window_size=(-1, -1))
+
+            out = rearrange(out, 'b n h d -> b n (h d)')
+            return self.to_out(out)
  
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):

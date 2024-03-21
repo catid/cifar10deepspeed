@@ -23,9 +23,7 @@ from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from flash_attn import flash_attn_func
-
-import math
+import xformers.ops as xops
 
 # helpers
 
@@ -69,18 +67,17 @@ class LSA(nn.Module):
         k = self.to_k(x)
         v = self.to_v(x)
 
-        q = rearrange(q, 'b n (h d) -> b h n d', h=self.heads)
-        k = rearrange(k, 'b n (h d) -> b h n d', h=self.heads)
-        v = rearrange(v, 'b n (h d) -> b h n d', h=self.heads)
+        q = rearrange(q, 'b n (h d) -> b n h d', h=self.heads)
+        k = rearrange(k, 'b n (h d) -> b n h d', h=self.heads)
+        v = rearrange(v, 'b n (h d) -> b n h d', h=self.heads)
 
-        out = F.scaled_dot_product_attention(
+        out = xops.memory_efficient_attention(
             q, k, v,
-            attn_mask=None,
-            dropout_p=self.dropout,
-            is_causal=False,
+            attn_bias=None, #xops.LowerTriangularMask(),
+            p=self.dropout,
             scale=None)
 
-        out = rearrange(out, 'b h n d -> b n (h d)', h=self.heads)
+        out = rearrange(out, 'b n h d -> b n (h d)', h=self.heads)
         return self.to_out(out)
 
 class Transformer(nn.Module):

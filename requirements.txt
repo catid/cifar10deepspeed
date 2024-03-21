@@ -3,6 +3,9 @@ torch
 torchvision
 torchaudio
 
+#flash-attn is part of torch now
+xformers
+
 nvidia-dali-cuda120
 
 # Downloading dataset
