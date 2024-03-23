@@ -7,23 +7,9 @@ from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-# helpers
-
-def pair(t):
-    return t if isinstance(t, tuple) else (t, t)
-
-# classes
-
-# https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_for_small_dataset.py
-
-import torch
-import torch.nn.functional as F
-from torch import nn
-
-from einops import rearrange, repeat
-from einops.layers.torch import Rearrange
-
 import xformers.ops as xops
+
+from .srmsnorm import FastSimpleRMSNorm
 
 # helpers
 
@@ -46,7 +32,7 @@ class FeedForward(nn.Module):
         y = self.net(x)
         return y
 
-use_gqa = True
+use_gqa = False
 
 if use_gqa:
 
@@ -125,22 +111,46 @@ else:
             out = rearrange(out, 'b n h d -> b n (h d)', h=self.heads)
             return self.to_out(out)
 
+class SGLU(nn.Module):
+    def __init__(self, d_in=64, mlp_dim=256, d_out=64, bias=False):
+        super().__init__()
+
+        self.in_u = nn.Linear(d_in, mlp_dim, bias=bias)
+        self.in_v = nn.Linear(d_in, mlp_dim, bias=bias)
+        self.out_proj = nn.Linear(mlp_dim, d_out, bias=bias)
+
+    def forward(self, x):
+        return self.out_proj(self.in_u(x) * self.in_v(x))
+
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         super().__init__()
+        self.norm = FastSimpleRMSNorm(dim)
+
         self.layers = nn.ModuleList([])
-        for _ in range(depth):
+        for _ in range(depth - 1):
             self.layers.append(nn.ModuleList([
-                nn.LayerNorm(dim),
                 LSA(dim, heads = heads, dim_head = dim_head, dropout = dropout),
-                FeedForward(dim, mlp_dim, dropout = dropout)
+                SGLU(dim, mlp_dim, dim)
             ]))
+
+        self.final_attn = LSA(dim, heads=heads, dim_head=dim_head, dropout=dropout) 
+        self.final_ffn = SGLU(dim, mlp_dim, dim)
+
     def forward(self, x):
-        for norm, attn, ff in self.layers:
-            x = norm(x)
-            x = attn(x) + x
-            x = norm(x)
-            x = ff(x) + x
+        x = self.norm(x)
+        x = self.final_attn(x) + x
+
+        for attn, ff in self.layers:
+            for _ in range(2):
+                x = self.norm(x)
+                x = attn(x) + x
+
+                x = self.norm(x)
+                x = ff(x) + x
+
+        x = self.norm(x)
+        x = self.final_ffn(x) + x
         return x
 
 class SPT(nn.Module):
