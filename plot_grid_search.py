@@ -17,7 +17,7 @@ def extract_experiments_from_text(text):
     # Define the regex pattern to capture the details of each experiment
     experiment_pattern = re.compile(
         r"Experiment:"
-        r".*?name:\s*(?P<name>baseline-lr\d+_wd\d+)"
+        r".*?name:\s*(?P<name>schedulefree)"
         r".*?arch:\s*(?P<arch>[^\n]+)"
         r".*?params:\s*(?P<params>[^\n]+)"
         r".*?best_val_acc:\s*(?P<best_val_acc>[\d.]+(?:e-?\d+)?)"
@@ -113,7 +113,7 @@ def plot_heatmap(data, output_filename="grid_search_result.png"):
 
 def main():
     parser = argparse.ArgumentParser(description="Plot heatmap from experiment results.")
-    parser.add_argument("filepath", type=str, help="Path to the text file containing experiment results.", default="combined_results.txt", nargs='?')
+    parser.add_argument("filepath", type=str, help="Path to the text file containing experiment results.", default="results.txt", nargs='?')
     args = parser.parse_args()
 
     data = parse_experiment_data(args.filepath)

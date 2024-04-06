@@ -39,3 +39,4 @@ matplotlib
 
 # Latest torch_optimizer
 torch_optimizer @ git+https://github.com/jettify/pytorch-optimizer.git
+schedulefree
