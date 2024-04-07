@@ -55,6 +55,9 @@ def parse_experiment_data(filepath):
 
     experiments = extract_experiments_from_text(content)
 
+    # Not sure why this is here
+    #experiments.pop()
+
     data = []
     for exp in experiments:
         name, best_val_acc, lr, weight_decay = exp["name"], float(exp["best_val_acc"]), float(exp["lr"]), float(exp["weight_decay"])
@@ -113,7 +116,7 @@ def plot_heatmap(data, output_filename="grid_search_result.png"):
 
 def main():
     parser = argparse.ArgumentParser(description="Plot heatmap from experiment results.")
-    parser.add_argument("filepath", type=str, help="Path to the text file containing experiment results.", default="results.txt", nargs='?')
+    parser.add_argument("filepath", type=str, help="Path to the text file containing experiment results.", default="combined_results.txt", nargs='?')
     args = parser.parse_args()
 
     data = parse_experiment_data(args.filepath)

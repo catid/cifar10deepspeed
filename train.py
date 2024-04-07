@@ -48,11 +48,12 @@ def ref_forward_and_loss(criterion, data, labels, model_engine):
     _, predicted = outputs.max(1)
     return criterion(outputs, labels), predicted
 
-def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine, optimizer, image_dtype):
+def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine, image_dtype, sf_optimizer=None):
     train_loss = 0.0
 
     model_engine.train()
-    optimizer.train()
+    if sf_optimizer is not None:
+        sf_optimizer.train()
 
     with torch.set_grad_enabled(True):
         for batch_idx, (labels, images) in enumerate(train_loader):
@@ -72,13 +73,14 @@ def train_one_epoch(opt_forward_and_loss, criterion, train_loader, model_engine,
 
     return train_loss
 
-def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engine, optimizer, image_dtype):
+def validation_one_epoch(opt_forward_and_loss, criterion, val_loader, model_engine, image_dtype, sf_optimizer=None):
     val_loss = 0.0
     correct = 0
     total = 0
 
     model_engine.eval()
-    optimizer.eval()
+    if sf_optimizer is not None:
+        sf_optimizer.eval()
 
     with torch.set_grad_enabled(False):
         for batch_idx, (labels, images) in enumerate(val_loader):
@@ -167,7 +169,7 @@ def record_experiment(args, params, best_train_loss, best_val_loss, best_val_acc
     data["optimizer"] = args.optimizer
     data["scheduler"] = args.scheduler
 
-    record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value]
+    record_lines = [f"\t{key.rjust(16)}: {value}" for key, value in data.items() if value is not None]
     text = "Experiment:\n" + "\n".join(record_lines) + "\n\n"
 
     with open(args.result_file, "a") as file:
@@ -240,7 +242,7 @@ def get_opt_class(opt_name):
         "SWATS": optimizers.SWATS,
         "Yogi": optimizers.Yogi,
         "Lilith": Lilith,
-        "ScheduleFree": schedulefree.AdamWScheduleFree
+        "ScheduleFree": schedulefree.AdamWScheduleFree,
     }
 
     # Return the optimizer class
@@ -269,8 +271,6 @@ def build_lr_scheduler(optimizer, scheduler_type, warmup_epochs, total_epochs, *
         scheduler = CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
     elif scheduler_type == "CosineAnnealingWarmRestarts":
         scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=kwargs.get('T_0', total_epochs - warmup_epochs), T_mult=kwargs.get('T_mult', 1))
-    elif scheduler_type == "None":
-        return None
     else:
         raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
 
@@ -340,8 +340,16 @@ def main(args):
 
     opt_class = get_opt_class(args.optimizer)
 
-    optimizer = schedulefree.AdamWScheduleFree(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = opt_class(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     lr_scheduler = build_lr_scheduler(optimizer, args.scheduler, warmup_epochs=args.warmup_epochs, total_epochs=args.max_epochs)
+
+    # ScheduleFree: We have to make some small changes to the training loop when using ScheduleFree
+    if args.optimizer == "ScheduleFree":
+        log_0("Using ScheduleFree optimizer")
+        sf_optimizer = optimizer
+        lr_scheduler = None
+    else:
+        sf_optimizer = None # Do not make any changes
 
     # Modify deepspeed configuration programmatically
     with open(args.deepspeed_config) as f:
@@ -353,7 +361,7 @@ def main(args):
     args.deepspeed_config = None
 
     # DeepSpeed engine
-    model_engine, optimizer_, _, _ = deepspeed.initialize(
+    model_engine, optimizer, _, _ = deepspeed.initialize(
         args=args,
         model=model,
         optimizer=optimizer,
@@ -485,12 +493,12 @@ def main(args):
         end_epoch = epoch
         start_time = time.time()
 
-        train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, optimizer, image_dtype)
+        train_loss = train_one_epoch(forward_and_loss, criterion, train_loader, model_engine, image_dtype, sf_optimizer)
 
         if args.weight_hack:
             weight_limiter.apply(epoch)
 
-        val_loss, correct, total, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine, optimizer, image_dtype)
+        val_loss, correct, total, examples = validation_one_epoch(forward_and_loss, criterion, val_loader, model_engine, image_dtype, sf_optimizer)
 
         end_time = time.time()
         epoch_time = end_time - start_time
@@ -618,12 +626,12 @@ if __name__ == "__main__":
 
     # Hyperparameters
     parser.add_argument("--fp32_enabled", action='store_true', help="Enable fp32 training (fp16 default)")
-    parser.add_argument("--lr", type=float, default=0.005, help="Learning rate for training")
-    parser.add_argument("--weight-decay", type=float, default=0.1, help="Weight decay for training")
+    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate for training")
+    parser.add_argument("--weight-decay", type=float, default=0.001, help="Weight decay for training")
     parser.add_argument("--max-epochs", type=int, default=300, help="Maximum epochs to train")
     parser.add_argument("--warmup-epochs", type=int, default=5, help="Number of epochs to apply warmup LR schedule")
-    parser.add_argument("--optimizer", type=str, default="ScheduleFree", help="Optimizer to use for training")
-    parser.add_argument("--scheduler", type=str, default="None", help="LR scheduler to use for training")
+    parser.add_argument("--optimizer", type=str, default="AdamW", help="Optimizer to use for training")
+    parser.add_argument("--scheduler", type=str, default="CosineAnnealingWarmRestarts", help="LR scheduler to use for training")
     parser.add_argument("--patience", type=int, default=50, help="Patience for validation loss not decreasing before early stopping")
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate for training")
 
