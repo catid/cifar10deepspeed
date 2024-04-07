@@ -4,7 +4,7 @@
 
 notes="exp_schedulefree.sh" # no spaces allowed
 iterations=1
-arch="xformers" # no spaces allowed
+arch="vit_xformers" # no spaces allowed
 
 name="xformers_schedulefree" # no spaces allowed
 optimizer="ScheduleFree"
