@@ -75,7 +75,7 @@ class Hgru2(nn.Module):
         K = 1 - lambda_
 
         V, Q, G_K, K = map(
-            lambda x: rearrange(x, "b n d h -> b h n d")
+            lambda x: rearrange(x, "b n h d -> b h n d")
             #.to(torch.float32)
             .contiguous(),
             [V, Q, log_lambda_, K],

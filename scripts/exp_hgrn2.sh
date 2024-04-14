@@ -13,7 +13,7 @@ launch_training() {
     # Loop to run the command multiple times
     for ((i=1; i<=iterations; i++)); do
         echo "Launching training (Iteration $i)..."
-        ./launch_local_train.sh --reset --name="${name}" --arch="${arch}" --lr="${lr}" --weight-decay="${weight_decay}" --notes="${notes}"
+        ./launch_local_train.sh --reset --name="${name}" --arch="${arch}" --lr="${lr}" --weight-decay="${weight_decay}" --nocompile --notes="${notes}"
     done
 }
 
