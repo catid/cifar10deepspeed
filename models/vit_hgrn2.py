@@ -81,8 +81,6 @@ class Hgru2(nn.Module):
             [V, Q, log_lambda_, K],
         )
 
-        print(f"Q.shape={Q.shape}, K.shape={K.shape}, V.shape={V.shape}")
-
         o, final_state = fused_chunk_gla(Q, K, V, G_K)
         o = rearrange(o, "b h n d -> b n (h d)").to(x.dtype)
         o = o[:n]
