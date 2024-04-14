@@ -9,8 +9,8 @@ from typing import List, Optional, Tuple, Union
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from .srmsnorm import FastSimpleRMSNorm
 from .gla.recurrent_fuse import fused_recurrent_gla
+from .gla.chunk_fuse import fused_chunk_gla
 from .gla.inter_chunk_contribution.fn import inter_chunk_onc
 from .gla.intra_chunk_contribution.fn import intra_chunk_onc
 
@@ -24,7 +24,7 @@ def pair(t):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
-        self.net = nn.Sequential(
+        self.ffn = nn.Sequential(
             nn.Linear(dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -32,7 +32,7 @@ class FeedForward(nn.Module):
             nn.Dropout(dropout)
         )
     def forward(self, x):
-        y = self.net(x)
+        y = self.ffn(x)
         return y
 
 class Hgru2(nn.Module):
@@ -43,8 +43,6 @@ class Hgru2(nn.Module):
         bias=False,
     ):
         super().__init__()
-        # get local varables
-        params = locals()
 
         self.expand_ratio = expand_ratio
         self.in_proj = nn.Linear(embed_dim, 3 * embed_dim, bias=bias)
@@ -76,30 +74,21 @@ class Hgru2(nn.Module):
 
         K = 1 - lambda_
 
-        if self.training:
-            V, Q, G_K, K = map(
-                lambda x: rearrange(
-                    self.pad(x), "(n c) b h d -> b h n c d", c=self.chunk_size
-                ).contiguous(),
-                [V, Q, log_lambda_, K],
-            )
-            G_V = None
-            G_K, G_V, o1 = inter_chunk_onc(Q, K, V, G_K, G_V)
-            o2 = intra_chunk_onc(Q, K, V, G_K, G_V)
-            o = o1 + o2
-            o = rearrange(o, "b h n c d -> (n c) b (h d)")
-        else:
-            V, Q, G_K, K = map(
-                lambda x: rearrange(x, "n b h d -> b h n d")
-                .to(torch.float32)
-                .contiguous(),
-                [V, Q, log_lambda_, K],
-            )
-            o = fused_recurrent_gla(Q, K, V, G_K)
-            o = rearrange(o, "b h n d -> n b (h d)").to(x.dtype)
+        V, Q, G_K, K = map(
+            lambda x: rearrange(x, "b n d h -> b h n d")
+            #.to(torch.float32)
+            .contiguous(),
+            [V, Q, log_lambda_, K],
+        )
+
+        print(f"Q.shape={Q.shape}, K.shape={K.shape}, V.shape={V.shape}")
+
+        o, final_state = fused_chunk_gla(Q, K, V, G_K)
+        o = rearrange(o, "b h n d -> b n (h d)").to(x.dtype)
+        o = o[:n]
 
         # out proj
-        output = self.out_proj(o[:n])
+        output = self.out_proj(o)
 
         return output
 
@@ -115,7 +104,6 @@ class Hgru2(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, dim, depth, expand_ratio, mlp_dim, dropout = 0.):
         super().__init__()
-        self.norm = FastSimpleRMSNorm(dim)
 
         self.lower_bounds = nn.Parameter(
             torch.ones(depth, dim), requires_grad=True
@@ -126,9 +114,12 @@ class Transformer(nn.Module):
             self.layers.append(
                 nn.ModuleList([
                     Hgru2(embed_dim=dim, expand_ratio=expand_ratio, bias=False),
+                    nn.LayerNorm(dim),
                     FeedForward(dim=dim, hidden_dim=mlp_dim, dropout=dropout),
+                    nn.LayerNorm(dim),
                 ])
             )
+        self.final_norm = nn.LayerNorm(dim)
     def forward(self, x):
         # lower bound
         lower_bounds = self.lower_bounds
@@ -136,12 +127,11 @@ class Transformer(nn.Module):
         lower_bounds = torch.cumsum(lower_bounds, dim=0)
         lower_bounds -= lower_bounds[0, ...].clone()
 
-        for idx, (attn, ff) in enumerate(self.layers):
+        for idx, (attn, attn_norm, ff, ff_norm) in enumerate(self.layers):
             lower_bound = lower_bounds[idx]
-            x = attn(self.norm(x), lower_bound) + x
-            x = ff(self.norm(x)) + x
-        x = self.norm(x)
-        return x
+            x = attn(attn_norm(x), lower_bound) + x
+            x = ff(ff_norm(x)) + x
+        return self.final_norm(x)
 
 class SPT(nn.Module):
     def __init__(self, *, dim, patch_size, channels = 3):
@@ -190,6 +180,8 @@ class ViT(nn.Module):
 
     def forward(self, img):
         x = self.to_patch_embedding(img)
+        x = x[:, :-1, :]
+
         b, n, _ = x.shape
 
         cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)

@@ -154,8 +154,8 @@ def main(args):
 
     num_params = sum(p.numel() for p in model.parameters())
 
-    #for name, param in model.named_parameters():
-    #    print(f"{name}: shape={param.shape} numel={param.numel()}")
+    for name, param in model.named_parameters():
+        print(f"{name}: shape={param.shape} numel={param.numel()}")
 
     logger.info(f"Loaded model with arch={args.arch} config={params_to_string(params)} fp16={args.fp16} model size = {num_params} weights")
 

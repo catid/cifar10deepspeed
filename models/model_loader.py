@@ -66,7 +66,7 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
         define_param(params_dict, "depth", 4)
-        define_param(params_dict, "expand_ratio", 128)
+        define_param(params_dict, "expand_ratio", 8)
         define_param(params_dict, "mlp_dim", 256)
     if arch == "vit_fa2":
         define_param(params_dict, "patch_size", 4)
