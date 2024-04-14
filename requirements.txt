@@ -41,4 +41,6 @@ matplotlib
 torch_optimizer @ git+https://github.com/jettify/pytorch-optimizer.git
 schedulefree
 
+# HGRN2 dependencies
 fla @ git+https://github.com/sustcsonglin/flash-linear-attention
+transformers
