@@ -66,7 +66,8 @@ def apply_default_model_params(arch, params_dict):
         define_param(params_dict, "patch_size", 4)
         define_param(params_dict, "dim", 512)
         define_param(params_dict, "depth", 4)
-        define_param(params_dict, "expand_ratio", 64)
+        define_param(params_dict, "heads", 8)
+        define_param(params_dict, "expand_ratio", 48)
         define_param(params_dict, "mlp_dim", 256)
     if arch == "vit_fa2":
         define_param(params_dict, "patch_size", 4)
@@ -227,13 +228,14 @@ def select_model(args):
         )
 
     if args.arch == "vit_hgrn2":
-        from models.vit_hgrn2 import ViT
-        return params_dict, ViT(
+        from models.vit_hgrn2 import Hgrn2ViT
+        return params_dict, Hgrn2ViT(
             image_size = 32,
             patch_size = params_dict["patch_size"],
             num_classes = 10,
             dim = params_dict["dim"],
             depth = params_dict["depth"],
+            num_heads = params_dict["heads"],
             expand_ratio = params_dict["expand_ratio"],
             mlp_dim = params_dict["mlp_dim"],
             dropout = dropout,

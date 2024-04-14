@@ -4,15 +4,11 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from typing import List, Optional, Tuple, Union
-
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from .gla.recurrent_fuse import fused_recurrent_gla
-from .gla.chunk_fuse import fused_chunk_gla
-from .gla.inter_chunk_contribution.fn import inter_chunk_onc
-from .gla.intra_chunk_contribution.fn import intra_chunk_onc
+from fla.ops import fused_recurrent_gla
+from .srmsnorm import FastSimpleRMSNorm
 
 # helpers
 
@@ -35,87 +31,70 @@ class FeedForward(nn.Module):
         y = self.ffn(x)
         return y
 
-class Hgru2(nn.Module):
+class Hgrn2(nn.Module):
     def __init__(
         self,
         embed_dim,
+        num_heads=64,
         expand_ratio=2,
-        bias=False,
     ):
         super().__init__()
 
         self.expand_ratio = expand_ratio
-        self.in_proj = nn.Linear(embed_dim, 3 * embed_dim, bias=bias)
-        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.in_act = nn.GELU()
-        self.out_act = nn.GELU()
+        forget_dim = num_heads * expand_ratio
+        self.num_heads = num_heads
 
-        self.chunk_size = 128
+        self.q_proj = nn.Linear(embed_dim, forget_dim, bias=False)
+        self.f_proj = nn.Linear(embed_dim, forget_dim, bias=False)
+        #self.i_proj = nn.Linear(embed_dim, embed_dim, bias=False) This is what HGRN2 paper does
+        self.i_proj = nn.Linear(embed_dim, forget_dim, bias=False)
+
+        #self.o_proj = nn.Linear(embed_dim, embed_dim, bias=False) This is what HGRN2 paper does
+        self.o_proj = nn.Linear(forget_dim, embed_dim, bias=False)
+        self.in_act = nn.GELU()
 
     def forward(self, x, lower_bound=0.0):
-        b, n, d = x.shape
-        feature = self.in_proj(x)
-        V, Q, F_ = feature.chunk(3, dim=-1)
-        V = self.in_act(V)
-        Q = self.out_act(Q)
-        F_ = F.sigmoid(F_)
+        q = self.in_act(self.q_proj(x))
 
-        # reshape
-        # h is num_head, d is head dimension
-        V, Q, F_, lower_bound = map(
-            lambda x: rearrange(x, "... (h d) -> ... h d", d=self.expand_ratio), 
-            [V, Q, F_, lower_bound],
-        )
+        f = self.f_proj(x)
+        g = lower_bound + (1 - lower_bound) * f.sigmoid()
 
-        lambda_ = lower_bound + (1 - lower_bound) * F_
+        i = self.i_proj(x)
 
-        log_lambda_ = torch.log(lambda_)
+        k = 1 - g
 
-        K = 1 - lambda_
+        g = torch.log(g + 1e-6) # Add epsilon to avoid log(0)
 
-        V, Q, G_K, K = map(
-            lambda x: rearrange(x, "b n h d -> b h n d")
-            #.to(torch.float32)
-            .contiguous(),
-            [V, Q, log_lambda_, K],
-        )
+        q, k, i, g = map(lambda x: rearrange(x, 'b l (h d) -> b h l d', h=self.num_heads), (q, k, i, g))
 
-        o, _ = fused_chunk_gla(Q, K, V, G_K)
-        o = rearrange(o, "b h n d -> b n (h d)").to(x.dtype)
+        # We do not have a recurrent state here because it is just one sequence of tokens
+        o, _ = fused_recurrent_gla(q, k, i, g, initial_state=None, output_final_state=False)
 
-        # out proj
-        output = self.out_proj(o)
+        o = rearrange(o, 'b h l d -> b l (h d)')
+        o = self.o_proj(o)
 
-        return output
+        return o
 
-    def pad(self, x):
-        # n, b, h, d
-        n, b, h, d = x.shape
-        if n % self.chunk_size == 0:
-            return x
-        else:
-            pad = self.chunk_size - n % self.chunk_size
-            return F.pad(x, (0, 0, 0, 0, 0, 0, 0, pad)).contiguous()
-
-class Transformer(nn.Module):
-    def __init__(self, dim, depth, expand_ratio, mlp_dim, dropout = 0.):
+class Hgrn2Former(nn.Module):
+    def __init__(self, dim, depth, num_heads, expand_ratio, mlp_dim, dropout = 0.):
         super().__init__()
 
+        self.norm = FastSimpleRMSNorm(dim)
+
+        lb_dim = num_heads * expand_ratio
+
         self.lower_bounds = nn.Parameter(
-            torch.ones(depth, dim), requires_grad=True
+            torch.ones(depth, lb_dim), requires_grad=True
         )
 
         self.layers = nn.ModuleList([])
         for idx in range(depth):
             self.layers.append(
                 nn.ModuleList([
-                    Hgru2(embed_dim=dim, expand_ratio=expand_ratio, bias=False),
-                    nn.LayerNorm(dim),
+                    Hgrn2(embed_dim=dim, num_heads=num_heads, expand_ratio=expand_ratio),
                     FeedForward(dim=dim, hidden_dim=mlp_dim, dropout=dropout),
-                    nn.LayerNorm(dim),
                 ])
             )
-        self.final_norm = nn.LayerNorm(dim)
     def forward(self, x):
         # lower bound
         lower_bounds = self.lower_bounds
@@ -123,11 +102,11 @@ class Transformer(nn.Module):
         lower_bounds = torch.cumsum(lower_bounds, dim=0)
         lower_bounds -= lower_bounds[0, ...].clone()
 
-        for idx, (attn, attn_norm, ff, ff_norm) in enumerate(self.layers):
+        for idx, (attn, ff) in enumerate(self.layers):
             lower_bound = lower_bounds[idx]
-            x = attn(attn_norm(x), lower_bound) + x
-            x = ff(ff_norm(x)) + x
-        return self.final_norm(x)
+            x = attn(self.norm(x), lower_bound) + x
+            x = ff(self.norm(x)) + x
+        return self.norm(x)
 
 class SPT(nn.Module):
     def __init__(self, *, dim, patch_size, channels = 3):
@@ -146,8 +125,8 @@ class SPT(nn.Module):
         x_with_shifts = torch.cat((x, *shifted_x), dim = 1)
         return self.to_patch_tokens(x_with_shifts)
 
-class ViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, expand_ratio, mlp_dim, pool = 'cls', channels = 3, dropout = 0., emb_dropout = 0.):
+class Hgrn2ViT(nn.Module):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, num_heads, expand_ratio, mlp_dim, pool = 'cls', channels = 3, dropout = 0., emb_dropout = 0.):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
@@ -164,7 +143,7 @@ class ViT(nn.Module):
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(emb_dropout)
 
-        self.transformer = Transformer(dim, depth, expand_ratio, mlp_dim, dropout)
+        self.transformer = Hgrn2Former(dim, depth, num_heads, expand_ratio, mlp_dim, dropout)
 
         self.pool = pool
         self.to_latent = nn.Identity()
@@ -181,13 +160,13 @@ class ViT(nn.Module):
         b, n, _ = x.shape
 
         cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
-        x = torch.cat((cls_tokens, x), dim=1)
+        x = torch.cat((x, cls_tokens), dim=1)
         x += self.pos_embedding[:, :(n + 1)]
         x = self.dropout(x)
 
         x = self.transformer(x)
 
-        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
+        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, -1, :]
 
         x = self.to_latent(x)
         return self.mlp_head(x)

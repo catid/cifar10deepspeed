@@ -449,9 +449,7 @@ def main(args):
 
     forward_and_loss = ref_forward_and_loss
 
-    # The time this takes to compile sadly offsets the time it saves
-    # Without dynamic=True it actually takes *longer* overall
-    if not args.nocompile:
+    if args.compile:
         forward_and_loss = torch.compile(forward_and_loss, dynamic=True, fullgraph=False)
 
     # Initialize training
@@ -618,7 +616,7 @@ if __name__ == "__main__":
     parser.add_argument("--result-file", type=str, default="results.txt", help="Append the experiment results to a file")
     parser.add_argument("--notes", type=str, default="", help="Provide any additional notes about the experiment to record")
     parser.add_argument("--seed", type=int, default=-1, help="Seed for random numbers.  Set to -1 to pick a random seed")
-    parser.add_argument("--nocompile", action="store_true", help="Disable torch.compile")
+    parser.add_argument("--compile", action="store_true", help="Enable torch.compile")
 
     parser.add_argument("--wandb", action="store_true", help="Enable Weights & Biases")
     parser.add_argument("--name", type=str, default="", help="Give your experiment a name")

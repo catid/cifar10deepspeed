@@ -115,7 +115,7 @@ class SNLinear(nn.Linear):
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
-        self.net = nn.Sequential(
+        self.ffn = nn.Sequential(
             nn.Linear(dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -123,7 +123,7 @@ class FeedForward(nn.Module):
             nn.Dropout(dropout)
         )
     def forward(self, x):
-        y = self.net(x)
+        y = self.ffn(x)
         return y
 
 class LSA(nn.Module):
