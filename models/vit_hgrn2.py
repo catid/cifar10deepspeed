@@ -53,8 +53,7 @@ class Hgru2(nn.Module):
         self.chunk_size = 128
 
     def forward(self, x, lower_bound=0.0):
-        ## x: n b d
-        n, b, d = x.shape
+        b, n, d = x.shape
         feature = self.in_proj(x)
         V, Q, F_ = feature.chunk(3, dim=-1)
         V = self.in_act(V)
@@ -64,7 +63,7 @@ class Hgru2(nn.Module):
         # reshape
         # h is num_head, d is head dimension
         V, Q, F_, lower_bound = map(
-            lambda x: rearrange(x, "... (h d) -> ... h d", d=self.expand_ratio),
+            lambda x: rearrange(x, "... (h d) -> ... h d", d=self.expand_ratio), 
             [V, Q, F_, lower_bound],
         )
 
@@ -81,9 +80,8 @@ class Hgru2(nn.Module):
             [V, Q, log_lambda_, K],
         )
 
-        o, final_state = fused_chunk_gla(Q, K, V, G_K)
+        o, _ = fused_chunk_gla(Q, K, V, G_K)
         o = rearrange(o, "b h n d -> b n (h d)").to(x.dtype)
-        o = o[:n]
 
         # out proj
         output = self.out_proj(o)
@@ -178,7 +176,7 @@ class ViT(nn.Module):
 
     def forward(self, img):
         x = self.to_patch_embedding(img)
-        x = x[:, :-1, :]
+        #x = x[:, :-1, :]
 
         b, n, _ = x.shape
 
