@@ -53,6 +53,12 @@ class Hgrn2(nn.Module):
         self.o_proj = nn.Linear(forget_dim, embed_dim, bias=False)
         self.in_act = nn.GELU()
 
+        # Added an output activation, which seems to not hurt accuracy scores at all and is
+        # not in the original HGRN2 paper but is suggested by this paper:
+        # "The Illusion of State in State-Space Models" https://arxiv.org/abs/2404.08819
+        # It may help for language modeling, but I'm not sure.
+        self.out_act = nn.Tanh()
+
     def forward(self, x, lower_bound=0.0):
         q = self.in_act(self.q_proj(x))
 
@@ -71,7 +77,7 @@ class Hgrn2(nn.Module):
         o, _ = fused_recurrent_gla(q, k, i, g, initial_state=None, output_final_state=False)
 
         o = rearrange(o, 'b h l d -> b l (h d)')
-        o = self.o_proj(o)
+        o = self.o_proj(self.out_act(o))
 
         return o
 
